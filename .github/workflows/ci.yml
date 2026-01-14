@@ -22,3 +22,12 @@ jobs:
 
       - name: Test
         run: npm test
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Run E2E tests
+        run: npm run test:e2e
+
+      - name: Run Lighthouse CI
+        run: npm run test:lighthouse

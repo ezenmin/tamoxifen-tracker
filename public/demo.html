@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tamoxifen Tracker - DEMO</title>
     <meta name="description" content="Demo of Tamoxifen side effect tracker">
+    <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#8b5cf6">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1350,6 +1351,13 @@
         updateTabLabels();
         renderHistory();
         renderPartnerHistory();
+
+        // Register service worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js')
+                .then(reg => console.log('SW registered:', reg.scope))
+                .catch(err => console.error('SW registration failed:', err));
+        }
     </script>
 </body>
 </html>
