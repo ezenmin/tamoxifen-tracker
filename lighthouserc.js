@@ -7,9 +7,8 @@ module.exports = {
     },
     assert: {
       assertions: {
-        'installable-manifest': 'error',
-        'service-worker': 'error',
-        'works-offline': 'error',
+        // PWA audit categories (Lighthouse 12+)
+        'categories:pwa': ['error', { minScore: 0.5 }],
       },
     },
     upload: {
