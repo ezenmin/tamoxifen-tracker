@@ -3,6 +3,232 @@
  * All business logic here, UI-agnostic
  */
 
+// =============================================================================
+// SUPABASE CONFIGURATION
+// =============================================================================
+const SUPABASE_URL = 'https://mhloxubuifluwvnlrklb.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1obG94dWJ1aWZsdXd2bmxya2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MjE1NDgsImV4cCI6MjA4Mzk5NzU0OH0.LOoDwKQN9HrA38B3_qu0ONYSMz7hJw7Re9xnnkBXNHc';
+
+// Supabase client (initialized if supabase-js is loaded)
+let supabaseClient = null;
+let currentUser = null;
+let currentHouseholdId = null;
+let isShareMode = false;
+
+// Initialize Supabase client if available
+function initSupabase() {
+    if (typeof window !== 'undefined' && window.supabase && window.supabase.createClient) {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        return true;
+    }
+    return false;
+}
+
+// =============================================================================
+// AUTH FUNCTIONS
+// =============================================================================
+
+async function signInWithMagicLink(email) {
+    if (!supabaseClient) throw new Error('Supabase not initialized');
+    const redirectTo = window.location.origin + window.location.pathname;
+    const { error } = await supabaseClient.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: redirectTo }
+    });
+    if (error) throw error;
+    return { success: true };
+}
+
+async function signOut() {
+    if (!supabaseClient) return;
+    await supabaseClient.auth.signOut();
+    currentUser = null;
+    currentHouseholdId = null;
+}
+
+async function getSession() {
+    if (!supabaseClient) return null;
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    return session;
+}
+
+function onAuthStateChange(callback) {
+    if (!supabaseClient) return { data: { subscription: { unsubscribe: () => {} } } };
+    return supabaseClient.auth.onAuthStateChange((event, session) => {
+        currentUser = session?.user || null;
+        callback(event, session);
+    });
+}
+
+// =============================================================================
+// HOUSEHOLD FUNCTIONS
+// =============================================================================
+
+async function ensureHousehold() {
+    if (!supabaseClient || !currentUser) return null;
+
+    // Check if household exists
+    const { data: existing, error: selectError } = await supabaseClient
+        .from('households')
+        .select('id')
+        .eq('owner_user_id', currentUser.id)
+        .single();
+
+    if (existing) {
+        currentHouseholdId = existing.id;
+        return existing.id;
+    }
+
+    // Create household
+    const { data: created, error: insertError } = await supabaseClient
+        .from('households')
+        .insert({ owner_user_id: currentUser.id })
+        .select('id')
+        .single();
+
+    if (insertError) throw insertError;
+    currentHouseholdId = created.id;
+    return created.id;
+}
+
+// =============================================================================
+// SYNC FUNCTIONS
+// =============================================================================
+
+async function syncEntriesToSupabase(localEntries) {
+    if (!supabaseClient || !currentHouseholdId) return;
+
+    // Get remote entries
+    const { data: remoteEntries, error } = await supabaseClient
+        .from('entries')
+        .select('id, payload')
+        .eq('household_id', currentHouseholdId);
+
+    if (error) throw error;
+
+    const remoteIds = new Set((remoteEntries || []).map(e => e.payload?.id));
+
+    // Upsert local entries that don't exist remotely or need updating
+    for (const entry of localEntries) {
+        const occurredAt = entry.date ? entry.date.split('T')[0] : new Date().toISOString().split('T')[0];
+
+        // Check if entry exists by payload.id
+        const existingRemote = (remoteEntries || []).find(r => r.payload?.id === entry.id);
+
+        if (existingRemote) {
+            // Update if changed
+            await supabaseClient
+                .from('entries')
+                .update({ payload: entry, occurred_at: occurredAt })
+                .eq('id', existingRemote.id);
+        } else {
+            // Insert new
+            await supabaseClient
+                .from('entries')
+                .insert({
+                    household_id: currentHouseholdId,
+                    occurred_at: occurredAt,
+                    payload: entry
+                });
+        }
+    }
+}
+
+async function fetchEntriesFromSupabase() {
+    if (!supabaseClient || !currentHouseholdId) return [];
+
+    const { data, error } = await supabaseClient
+        .from('entries')
+        .select('payload')
+        .eq('household_id', currentHouseholdId)
+        .order('occurred_at', { ascending: false });
+
+    if (error) throw error;
+    return (data || []).map(row => row.payload);
+}
+
+async function deleteEntryFromSupabase(entryId) {
+    if (!supabaseClient || !currentHouseholdId) return;
+
+    // Find the entry by payload.id
+    const { data } = await supabaseClient
+        .from('entries')
+        .select('id, payload')
+        .eq('household_id', currentHouseholdId);
+
+    const toDelete = (data || []).find(r => r.payload?.id === entryId);
+    if (toDelete) {
+        await supabaseClient.from('entries').delete().eq('id', toDelete.id);
+    }
+}
+
+// =============================================================================
+// SHARE LINK FUNCTIONS
+// =============================================================================
+
+async function sha256Hex(message) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(message);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function generateSecureToken() {
+    const array = new Uint8Array(32);
+    crypto.getRandomValues(array);
+    return Array.from(array).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function createDoctorShareLink() {
+    if (!supabaseClient || !currentHouseholdId) throw new Error('Not authenticated');
+
+    const token = generateSecureToken();
+    const tokenHash = await sha256Hex(token);
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    const { error } = await supabaseClient
+        .from('share_links')
+        .insert({
+            household_id: currentHouseholdId,
+            token_hash: tokenHash,
+            expires_at: expiresAt.toISOString()
+        });
+
+    if (error) throw error;
+
+    // Return the full URL with token
+    const baseUrl = window.location.origin + window.location.pathname;
+    return `${baseUrl}?share=${token}`;
+}
+
+async function fetchDoctorSummary(token) {
+    const functionUrl = `${SUPABASE_URL}/functions/v1/doctor-summary?share=${encodeURIComponent(token)}`;
+    const response = await fetch(functionUrl);
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({ error: 'Request failed' }));
+        throw new Error(err.error || 'Failed to fetch summary');
+    }
+    return response.json();
+}
+
+// =============================================================================
+// SHARE MODE DETECTION
+// =============================================================================
+
+function checkShareMode() {
+    if (typeof window === 'undefined') return false;
+    const params = new URLSearchParams(window.location.search);
+    const shareToken = params.get('share') || params.get('token');
+    if (shareToken) {
+        isShareMode = true;
+        return shareToken;
+    }
+    return null;
+}
+
 const SIDE_EFFECT_TYPES = [
     'hot_flashes',
     'joint_pain',
@@ -490,6 +716,19 @@ if (typeof module !== 'undefined' && module.exports) {
         filterByAuthor,
         getChartData,
         getTopSymptomsByAvgSeverity,
-        getSymptomTrendData
+        getSymptomTrendData,
+        // Supabase functions (browser only, stubs for Node)
+        initSupabase: typeof initSupabase !== 'undefined' ? initSupabase : () => false,
+        signInWithMagicLink: typeof signInWithMagicLink !== 'undefined' ? signInWithMagicLink : async () => {},
+        signOut: typeof signOut !== 'undefined' ? signOut : async () => {},
+        getSession: typeof getSession !== 'undefined' ? getSession : async () => null,
+        onAuthStateChange: typeof onAuthStateChange !== 'undefined' ? onAuthStateChange : () => {},
+        ensureHousehold: typeof ensureHousehold !== 'undefined' ? ensureHousehold : async () => null,
+        syncEntriesToSupabase: typeof syncEntriesToSupabase !== 'undefined' ? syncEntriesToSupabase : async () => {},
+        fetchEntriesFromSupabase: typeof fetchEntriesFromSupabase !== 'undefined' ? fetchEntriesFromSupabase : async () => [],
+        deleteEntryFromSupabase: typeof deleteEntryFromSupabase !== 'undefined' ? deleteEntryFromSupabase : async () => {},
+        createDoctorShareLink: typeof createDoctorShareLink !== 'undefined' ? createDoctorShareLink : async () => '',
+        fetchDoctorSummary: typeof fetchDoctorSummary !== 'undefined' ? fetchDoctorSummary : async () => ({}),
+        checkShareMode: typeof checkShareMode !== 'undefined' ? checkShareMode : () => null
     };
 }

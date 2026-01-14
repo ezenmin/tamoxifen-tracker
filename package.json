@@ -12,6 +12,7 @@
   "devDependencies": {
     "@lhci/cli": "^0.14.0",
     "@playwright/test": "^1.49.0",
-    "http-server": "^14.1.1"
+    "http-server": "^14.1.1",
+    "supabase": "^2.72.7"
   }
 }

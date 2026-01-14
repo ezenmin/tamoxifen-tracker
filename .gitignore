@@ -7,6 +7,10 @@ tmpclaude-*
 # Claude CLI local settings
 .claude/
 
+# Environment / secrets
+.env
+.env.*
+
 # Logs (keep structure, ignore content)
 logs/*.jsonl
 
