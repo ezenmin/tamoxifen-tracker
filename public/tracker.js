@@ -15,6 +15,24 @@ let currentUser = null;
 let currentHouseholdId = null;
 let isShareMode = false;
 
+function getAppBaseUrl() {
+    const origin = window.location.origin;
+    const pathname = window.location.pathname;
+
+    // If we're on a file path (e.g., /demo.html), base is the containing directory.
+    // If we're on a directory without trailing slash (e.g., /tamoxifen-tracker), treat it as a directory.
+    let basePath;
+    if (pathname.endsWith('/')) {
+        basePath = pathname;
+    } else if (pathname.includes('.')) {
+        basePath = pathname.slice(0, pathname.lastIndexOf('/') + 1);
+    } else {
+        basePath = pathname + '/';
+    }
+
+    return origin + basePath;
+}
+
 // Initialize Supabase client if available
 function initSupabase() {
     if (typeof window !== 'undefined' && window.supabase && window.supabase.createClient) {
@@ -30,7 +48,7 @@ function initSupabase() {
 
 async function signInWithMagicLink(email) {
     if (!supabaseClient) throw new Error('Supabase not initialized');
-    const redirectTo = window.location.origin + window.location.pathname;
+    const redirectTo = getAppBaseUrl();
     const { error } = await supabaseClient.auth.signInWithOtp({
         email,
         options: { emailRedirectTo: redirectTo }
@@ -199,8 +217,8 @@ async function createDoctorShareLink() {
 
     if (error) throw error;
 
-    // Return the full URL with token
-    const baseUrl = window.location.origin + window.location.pathname;
+    // Return the full URL with token (always use the app base URL, not demo.html)
+    const baseUrl = getAppBaseUrl();
     return `${baseUrl}?share=${token}`;
 }
 
