@@ -12,6 +12,19 @@ A lightweight, static web app to track Tamoxifen side effects and quickly genera
 
 - Run: `npm test`
 
+## Deploy (GitHub Pages)
+
+This repo includes a GitHub Actions workflow that deploys the contents of `public/` to GitHub Pages on every push to `main`.
+
+One-time repo setup:
+
+1) GitHub repo → **Settings** → **Pages**
+2) Under **Build and deployment**, set **Source** to **GitHub Actions**
+
+After the workflow runs, your site should be available at:
+
+- `https://ezenmin.github.io/tamoxifen-tracker/`
+
 ## Data & privacy
 
 - The app stores entries in your browser (LocalStorage).
