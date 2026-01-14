@@ -1544,6 +1544,24 @@
                     updateAuthUI(session);
                     if (session) {
                         await ensureHousehold();
+
+                        // Fetch remote entries on login (for new device sync)
+                        try {
+                            const remoteEntries = await fetchEntriesFromSupabase();
+                            if (remoteEntries.length > 0) {
+                                const localEntries = getEntries();
+                                const mergedMap = new Map();
+                                localEntries.forEach(e => mergedMap.set(e.id, e));
+                                remoteEntries.forEach(e => mergedMap.set(e.id, e));
+                                const merged = Array.from(mergedMap.values());
+                                merged.sort((a, b) => new Date(b.date) - new Date(a.date));
+                                saveEntries(merged);
+                                renderHistory();
+                                buildEffectList('effect-list', 'patient');
+                            }
+                        } catch (e) {
+                            console.error('Sync error:', e);
+                        }
                     }
                 });
             }

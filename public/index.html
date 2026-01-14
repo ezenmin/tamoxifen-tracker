@@ -1747,10 +1747,30 @@
                     updateAuthUI(session);
                     if (session) {
                         await ensureHousehold();
-                        // Sync on login
-                        const entries = getEntries();
-                        if (entries.length > 0) {
-                            await syncEntriesToSupabase(entries);
+
+                        // First fetch remote entries (for new device sync)
+                        try {
+                            const remoteEntries = await fetchEntriesFromSupabase();
+                            const localEntries = getEntries();
+
+                            // Merge: remote takes precedence
+                            const mergedMap = new Map();
+                            localEntries.forEach(e => mergedMap.set(e.id, e));
+                            remoteEntries.forEach(e => mergedMap.set(e.id, e));
+                            const merged = Array.from(mergedMap.values());
+                            merged.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                            // Save merged locally (without triggering sync back)
+                            originalSaveEntries(merged);
+                            renderHistory();
+                            buildEffectList('effect-list', 'patient');
+
+                            // Then push any local-only entries to remote
+                            if (localEntries.length > 0) {
+                                await syncEntriesToSupabase(merged);
+                            }
+                        } catch (e) {
+                            console.error('Sync error:', e);
                         }
                     }
                 });
