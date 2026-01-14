@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Temp files
+tmpclaude-*
+
+# Claude CLI local settings
+.claude/
+
+# Logs (keep structure, ignore content)
+logs/*.jsonl
+
+# Local patient data (keep test data)
+data/entries.json
+
+# Build output
+dist/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+*.swp

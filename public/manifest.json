@@ -1,0 +1,16 @@
+{
+  "name": "Tamoxifen Tracker",
+  "short_name": "TamoxTracker",
+  "description": "Track Tamoxifen side effects and share with your doctor",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fdf2f8",
+  "theme_color": "#e91e8c",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}

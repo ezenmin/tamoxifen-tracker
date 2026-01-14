@@ -1,0 +1,739 @@
+{
+  "patientEntries": [
+    {
+      "id": "mkczwtoz95i17",
+      "type": "fatigue",
+      "severity": 4,
+      "notes": "Lasted about 2 hours",
+      "date": "2025-11-14T17:54:28.978Z"
+    },
+    {
+      "id": "mkczwtozncmgf",
+      "type": "nausea",
+      "severity": 4,
+      "notes": "Worse than yesterday",
+      "date": "2025-11-14T20:29:28.978Z"
+    },
+    {
+      "id": "mkczwtozyu2m8",
+      "type": "mood_changes",
+      "severity": 3,
+      "notes": "Lasted about 2 hours",
+      "date": "2025-11-18T01:39:28.978Z"
+    },
+    {
+      "id": "mkczwtoz6yeos",
+      "type": "other",
+      "severity": 4,
+      "notes": "Better after resting",
+      "date": "2025-11-17T13:55:28.978Z"
+    },
+    {
+      "id": "mkczwtozpxmas",
+      "type": "mood_changes",
+      "severity": 3,
+      "notes": "Woke up feeling this way",
+      "date": "2025-11-18T16:32:28.978Z"
+    },
+    {
+      "id": "mkczwtozp29ug",
+      "type": "fatigue",
+      "severity": 4,
+      "notes": "Night time episode",
+      "date": "2025-11-18T17:00:28.978Z"
+    },
+    {
+      "id": "mkczwtoz49iau",
+      "type": "hot_flashes",
+      "severity": 3,
+      "notes": "Drinking more water helped",
+      "date": "2025-11-19T23:34:28.978Z"
+    },
+    {
+      "id": "mkczwtozfopq1",
+      "type": "other",
+      "severity": 2,
+      "notes": "Woke up feeling this way",
+      "date": "2025-11-20T14:39:28.978Z"
+    },
+    {
+      "id": "mkczwtozqx2pa",
+      "type": "sleep_problems",
+      "severity": 3,
+      "notes": "Had to lie down",
+      "date": "2025-11-21T23:41:28.978Z"
+    },
+    {
+      "id": "mkczwtozsaw1r",
+      "type": "joint_pain",
+      "severity": 4,
+      "notes": "Drinking more water helped",
+      "date": "2025-11-21T19:19:28.978Z"
+    },
+    {
+      "id": "mkczwtozdkovm",
+      "type": "sleep_problems",
+      "severity": 1,
+      "notes": "Exercise seemed to trigger it",
+      "date": "2025-11-22T19:30:28.978Z"
+    },
+    {
+      "id": "mkczwtozcnx7f",
+      "type": "fatigue",
+      "severity": 3,
+      "notes": "Woke up feeling this way",
+      "date": "2025-11-22T22:03:28.978Z"
+    },
+    {
+      "id": "mkczwtozeosij",
+      "type": "sleep_problems",
+      "severity": 3,
+      "notes": "Happened during work meeting",
+      "date": "2025-11-24T21:09:28.978Z"
+    },
+    {
+      "id": "mkczwtozfvatp",
+      "type": "fatigue",
+      "severity": 4,
+      "notes": "Noticed after taking medication",
+      "date": "2025-11-25T21:48:28.978Z"
+    },
+    {
+      "id": "mkczwtozb0ab2",
+      "type": "sleep_problems",
+      "severity": 3,
+      "notes": "Morning was rough",
+      "date": "2025-11-26T17:07:28.978Z"
+    },
+    {
+      "id": "mkczwtoz84qj5",
+      "type": "sleep_problems",
+      "severity": 2,
+      "notes": "Had to lie down",
+      "date": "2025-11-26T17:22:28.978Z"
+    },
+    {
+      "id": "mkczwtozd6nfw",
+      "type": "fatigue",
+      "severity": 4,
+      "notes": "Lasted about 2 hours",
+      "date": "2025-11-27T12:09:28.978Z"
+    },
+    {
+      "id": "mkczwtozvyffz",
+      "type": "nausea",
+      "severity": 5,
+      "notes": "Woke up feeling this way",
+      "date": "2025-11-27T20:32:28.978Z"
+    },
+    {
+      "id": "mkczwtoz6mmzw",
+      "type": "sleep_problems",
+      "severity": 2,
+      "notes": "Feeling better now",
+      "date": "2025-11-28T14:25:28.978Z"
+    },
+    {
+      "id": "mkczwtozwcxun",
+      "type": "muscle_pain",
+      "severity": 3,
+      "notes": "Worse than yesterday",
+      "date": "2025-11-28T15:45:28.978Z"
+    },
+    {
+      "id": "mkczwtoz6o8ki",
+      "type": "headaches",
+      "severity": 4,
+      "notes": "Night time episode",
+      "date": "2025-11-30T01:24:28.978Z"
+    },
+    {
+      "id": "mkczwtoz9yjpa",
+      "type": "headaches",
+      "severity": 4,
+      "notes": "Feeling better now",
+      "date": "2025-11-30T16:53:28.978Z"
+    },
+    {
+      "id": "mkczwtozqo6u5",
+      "type": "fatigue",
+      "severity": 4,
+      "notes": "Started after lunch",
+      "date": "2025-12-03T00:26:28.978Z"
+    },
+    {
+      "id": "mkczwtozug4ne",
+      "type": "headaches",
+      "severity": 5,
+      "notes": "Worse than yesterday",
+      "date": "2025-12-02T23:40:28.978Z"
+    },
+    {
+      "id": "mkczwtozh6juv",
+      "type": "muscle_pain",
+      "severity": 3,
+      "notes": "Morning was rough",
+      "date": "2025-12-05T23:05:28.978Z"
+    },
+    {
+      "id": "mkczwtozbawfa",
+      "type": "other",
+      "severity": 3,
+      "notes": "Woke up feeling this way",
+      "date": "2025-12-06T17:35:28.978Z"
+    },
+    {
+      "id": "mkczwtoz5g4by",
+      "type": "nausea",
+      "severity": 4,
+      "notes": "",
+      "date": "2025-12-07T18:11:28.978Z"
+    },
+    {
+      "id": "mkczwtoz6b2m0",
+      "type": "weight_changes",
+      "severity": 4,
+      "notes": "Worse than yesterday",
+      "date": "2025-12-07T23:35:28.978Z"
+    },
+    {
+      "id": "mkczwtozyf8gi",
+      "type": "hot_flashes",
+      "severity": 4,
+      "notes": "Had to lie down",
+      "date": "2025-12-08T16:46:28.978Z"
+    },
+    {
+      "id": "mkczwtozanbqs",
+      "type": "headaches",
+      "severity": 3,
+      "notes": "Better after resting",
+      "date": "2025-12-08T14:07:28.978Z"
+    },
+    {
+      "id": "mkczwtozsg68h",
+      "type": "sleep_problems",
+      "severity": 3,
+      "notes": "",
+      "date": "2025-12-10T18:35:28.978Z"
+    },
+    {
+      "id": "mkczwtozfewol",
+      "type": "headaches",
+      "severity": 4,
+      "notes": "Exercise seemed to trigger it",
+      "date": "2025-12-11T18:24:28.978Z"
+    },
+    {
+      "id": "mkczwtozsm6ng",
+      "type": "nausea",
+      "severity": 2,
+      "notes": "Exercise seemed to trigger it",
+      "date": "2025-12-12T01:10:28.978Z"
+    },
+    {
+      "id": "mkczwtozs0ywf",
+      "type": "sleep_problems",
+      "severity": 4,
+      "notes": "Woke up feeling this way",
+      "date": "2025-12-14T01:51:28.978Z"
+    },
+    {
+      "id": "mkczwtoz3sw5m",
+      "type": "hot_flashes",
+      "severity": 4,
+      "notes": "Worse than yesterday",
+      "date": "2025-12-14T00:22:28.978Z"
+    },
+    {
+      "id": "mkczwtozny7ig",
+      "type": "mood_changes",
+      "severity": 3,
+      "notes": "Had to lie down",
+      "date": "2025-12-17T23:46:28.978Z"
+    },
+    {
+      "id": "mkczwtozte6b1",
+      "type": "other",
+      "severity": 5,
+      "notes": "Started after lunch",
+      "date": "2025-12-18T00:22:28.978Z"
+    },
+    {
+      "id": "mkczwtozoecgs",
+      "type": "headaches",
+      "severity": 3,
+      "notes": "Exercise seemed to trigger it",
+      "date": "2025-12-18T18:42:28.978Z"
+    },
+    {
+      "id": "mkczwtoz3yzyi",
+      "type": "other",
+      "severity": 2,
+      "notes": "Feeling better now",
+      "date": "2025-12-22T12:27:28.978Z"
+    },
+    {
+      "id": "mkczwtozbd7lk",
+      "type": "hot_flashes",
+      "severity": 4,
+      "notes": "Had to lie down",
+      "date": "2025-12-24T21:59:28.978Z"
+    },
+    {
+      "id": "mkczwtozl4afo",
+      "type": "fatigue",
+      "severity": 2,
+      "notes": "Had to lie down",
+      "date": "2025-12-26T15:06:28.978Z"
+    },
+    {
+      "id": "mkczwtoz43jnq",
+      "type": "mood_changes",
+      "severity": 4,
+      "notes": "Noticed after taking medication",
+      "date": "2025-12-27T21:54:28.978Z"
+    },
+    {
+      "id": "mkczwtozt4xzz",
+      "type": "sleep_problems",
+      "severity": 4,
+      "notes": "Took ibuprofen, helped a bit",
+      "date": "2025-12-27T14:21:28.978Z"
+    },
+    {
+      "id": "mkczwtozum2cj",
+      "type": "headaches",
+      "severity": 2,
+      "notes": "Worse than yesterday",
+      "date": "2025-12-29T23:11:28.978Z"
+    },
+    {
+      "id": "mkczwtozxzklp",
+      "type": "joint_pain",
+      "severity": 3,
+      "notes": "Noticed after taking medication",
+      "date": "2025-12-29T20:42:28.978Z"
+    },
+    {
+      "id": "mkczwtozhjf2g",
+      "type": "other",
+      "severity": 3,
+      "notes": "",
+      "date": "2026-01-01T01:01:28.978Z"
+    },
+    {
+      "id": "mkczwtoz6p0br",
+      "type": "other",
+      "severity": 1,
+      "notes": "Night time episode",
+      "date": "2026-01-01T19:58:28.978Z"
+    },
+    {
+      "id": "mkczwtozsfhob",
+      "type": "other",
+      "severity": 4,
+      "notes": "Started after lunch",
+      "date": "2026-01-01T21:11:28.978Z"
+    },
+    {
+      "id": "mkczwtozojn1t",
+      "type": "fatigue",
+      "severity": 3,
+      "notes": "Feeling better now",
+      "date": "2026-01-02T18:06:28.978Z"
+    },
+    {
+      "id": "mkczwtozp3hbx",
+      "type": "fatigue",
+      "severity": 2,
+      "notes": "Feeling better now",
+      "date": "2026-01-03T18:40:28.978Z"
+    },
+    {
+      "id": "mkczwtoz95ugc",
+      "type": "nausea",
+      "severity": 5,
+      "notes": "Took ibuprofen, helped a bit",
+      "date": "2026-01-03T21:52:28.978Z"
+    },
+    {
+      "id": "mkczwtoz12q1o",
+      "type": "hot_flashes",
+      "severity": 4,
+      "notes": "Had to lie down",
+      "date": "2026-01-04T19:55:28.978Z"
+    },
+    {
+      "id": "mkczwtozxy7x3",
+      "type": "fatigue",
+      "severity": 4,
+      "notes": "Noticed after taking medication",
+      "date": "2026-01-04T19:42:28.978Z"
+    },
+    {
+      "id": "mkczwtozzmbtd",
+      "type": "nausea",
+      "severity": 3,
+      "notes": "Noticed after taking medication",
+      "date": "2026-01-06T01:47:28.978Z"
+    },
+    {
+      "id": "mkczwtp0dvls2",
+      "type": "hot_flashes",
+      "severity": 4,
+      "notes": "Feeling better now",
+      "date": "2026-01-06T12:34:28.978Z"
+    },
+    {
+      "id": "mkczwtp0tnng8",
+      "type": "fatigue",
+      "severity": 4,
+      "notes": "Night time episode",
+      "date": "2026-01-06T18:38:28.978Z"
+    },
+    {
+      "id": "mkczwtp0o55xo",
+      "type": "headaches",
+      "severity": 4,
+      "notes": "Night time episode",
+      "date": "2026-01-07T14:25:28.978Z"
+    },
+    {
+      "id": "mkczwtp0ppilm",
+      "type": "nausea",
+      "severity": 3,
+      "notes": "Took ibuprofen, helped a bit",
+      "date": "2026-01-08T01:40:28.978Z"
+    },
+    {
+      "id": "mkczwtp0leq0p",
+      "type": "headaches",
+      "severity": 2,
+      "notes": "Worse than yesterday",
+      "date": "2026-01-12T01:45:28.978Z"
+    }
+  ],
+  "partnerObservations": [
+    {
+      "id": "mkczwtp09c6rk",
+      "author": "partner",
+      "type": "seemed_uncomfortable",
+      "severity": 3,
+      "notes": "Seemed to feel better after lunch",
+      "date": "2025-11-14T23:33:28.980Z"
+    },
+    {
+      "id": "mkczwtp06ap4l",
+      "author": "partner",
+      "type": "appetite_change",
+      "severity": 2,
+      "notes": "She was moving slowly this morning",
+      "date": "2025-11-15T02:40:28.980Z"
+    },
+    {
+      "id": "mkczwtp0fe7ey",
+      "author": "partner",
+      "type": "mentioned_pain",
+      "severity": 4,
+      "notes": "She slept poorly last night",
+      "date": "2025-11-16T02:35:28.980Z"
+    },
+    {
+      "id": "mkczwtp0q300r",
+      "author": "partner",
+      "type": "appetite_change",
+      "severity": 4,
+      "notes": "Seemed to feel better after lunch",
+      "date": "2025-11-16T23:39:28.980Z"
+    },
+    {
+      "id": "mkczwtp06f3kt",
+      "author": "partner",
+      "type": "sleep_issues_observed",
+      "severity": 1,
+      "notes": "Didn't want to eat much at dinner",
+      "date": "2025-11-17T04:50:28.980Z"
+    },
+    {
+      "id": "mkczwtp0numcm",
+      "author": "partner",
+      "type": "mentioned_pain",
+      "severity": 4,
+      "notes": "She looked exhausted after work",
+      "date": "2025-11-19T01:06:28.980Z"
+    },
+    {
+      "id": "mkczwtp0snbe9",
+      "author": "partner",
+      "type": "seemed_uncomfortable",
+      "severity": 3,
+      "notes": "She went to bed early",
+      "date": "2025-11-18T23:03:28.980Z"
+    },
+    {
+      "id": "mkczwtp0owie9",
+      "author": "partner",
+      "type": "sleep_issues_observed",
+      "severity": 4,
+      "notes": "She seemed really uncomfortable today",
+      "date": "2025-11-20T04:15:28.980Z"
+    },
+    {
+      "id": "mkczwtp0iguq9",
+      "author": "partner",
+      "type": "seemed_tired",
+      "severity": 2,
+      "notes": "She seemed really uncomfortable today",
+      "date": "2025-11-23T00:35:28.980Z"
+    },
+    {
+      "id": "mkczwtp0w2z8x",
+      "author": "partner",
+      "type": "sleep_issues_observed",
+      "severity": 4,
+      "notes": "She mentioned her joints hurt",
+      "date": "2025-11-22T23:40:28.980Z"
+    },
+    {
+      "id": "mkczwtp0vcxiw",
+      "author": "partner",
+      "type": "noticed_mood_change",
+      "severity": 4,
+      "notes": "",
+      "date": "2025-11-24T03:57:28.980Z"
+    },
+    {
+      "id": "mkczwtp0aj32z",
+      "author": "partner",
+      "type": "mentioned_pain",
+      "severity": 4,
+      "notes": "Saw her rubbing her temples",
+      "date": "2025-11-25T02:32:28.980Z"
+    },
+    {
+      "id": "mkczwtp0j4gyo",
+      "author": "partner",
+      "type": "seemed_uncomfortable",
+      "severity": 4,
+      "notes": "Noticed she was quieter than usual",
+      "date": "2025-12-03T02:40:28.980Z"
+    },
+    {
+      "id": "mkczwtp0f3d1p",
+      "author": "partner",
+      "type": "seemed_uncomfortable",
+      "severity": 3,
+      "notes": "She mentioned her joints hurt",
+      "date": "2025-12-03T01:17:28.980Z"
+    },
+    {
+      "id": "mkczwtp0ozkz4",
+      "author": "partner",
+      "type": "mentioned_pain",
+      "severity": 3,
+      "notes": "Seemed to feel better after lunch",
+      "date": "2025-12-04T03:30:28.980Z"
+    },
+    {
+      "id": "mkczwtp0bsxqb",
+      "author": "partner",
+      "type": "sleep_issues_observed",
+      "severity": 3,
+      "notes": "",
+      "date": "2025-12-04T03:03:28.980Z"
+    },
+    {
+      "id": "mkczwtp0repcc",
+      "author": "partner",
+      "type": "appetite_change",
+      "severity": 1,
+      "notes": "Didn't want to eat much at dinner",
+      "date": "2025-12-07T00:38:28.980Z"
+    },
+    {
+      "id": "mkczwtp0rcxdf",
+      "author": "partner",
+      "type": "seemed_tired",
+      "severity": 3,
+      "notes": "Seemed to feel better after lunch",
+      "date": "2025-12-08T03:52:28.980Z"
+    },
+    {
+      "id": "mkczwtp0qja60",
+      "author": "partner",
+      "type": "mentioned_pain",
+      "severity": 4,
+      "notes": "Saw her rubbing her temples",
+      "date": "2025-12-07T23:34:28.980Z"
+    },
+    {
+      "id": "mkczwtp00ia23",
+      "author": "partner",
+      "type": "seemed_tired",
+      "severity": 4,
+      "notes": "More irritable than usual",
+      "date": "2025-12-14T01:40:28.980Z"
+    },
+    {
+      "id": "mkczwtp01j7vx",
+      "author": "partner",
+      "type": "noticed_mood_change",
+      "severity": 2,
+      "notes": "She went to bed early",
+      "date": "2025-12-14T23:07:28.980Z"
+    },
+    {
+      "id": "mkczwtp0a5vbh",
+      "author": "partner",
+      "type": "appetite_change",
+      "severity": 3,
+      "notes": "She seemed really uncomfortable today",
+      "date": "2025-12-14T23:03:28.980Z"
+    },
+    {
+      "id": "mkczwtp0pr6pe",
+      "author": "partner",
+      "type": "sleep_issues_observed",
+      "severity": 4,
+      "notes": "Saw her rubbing her temples",
+      "date": "2025-12-18T02:40:28.980Z"
+    },
+    {
+      "id": "mkczwtp0hdcx1",
+      "author": "partner",
+      "type": "appetite_change",
+      "severity": 4,
+      "notes": "She was moving slowly this morning",
+      "date": "2025-12-18T04:05:28.980Z"
+    },
+    {
+      "id": "mkczwtp0quhz1",
+      "author": "partner",
+      "type": "sleep_issues_observed",
+      "severity": 4,
+      "notes": "She slept poorly last night",
+      "date": "2025-12-20T02:23:28.980Z"
+    },
+    {
+      "id": "mkczwtp0fzzot",
+      "author": "partner",
+      "type": "other",
+      "severity": 4,
+      "notes": "She looked exhausted after work",
+      "date": "2025-12-19T23:02:28.980Z"
+    },
+    {
+      "id": "mkczwtp0agocu",
+      "author": "partner",
+      "type": "mentioned_pain",
+      "severity": 5,
+      "notes": "Asked if she was okay, she said tired",
+      "date": "2025-12-21T02:37:28.980Z"
+    },
+    {
+      "id": "mkczwtp0cvaii",
+      "author": "partner",
+      "type": "seemed_tired",
+      "severity": 4,
+      "notes": "She seemed really uncomfortable today",
+      "date": "2025-12-21T00:37:28.980Z"
+    },
+    {
+      "id": "mkczwtp0i3aqw",
+      "author": "partner",
+      "type": "sleep_issues_observed",
+      "severity": 3,
+      "notes": "She seemed really uncomfortable today",
+      "date": "2025-12-27T01:30:28.980Z"
+    },
+    {
+      "id": "mkczwtp0dkws5",
+      "author": "partner",
+      "type": "sleep_issues_observed",
+      "severity": 4,
+      "notes": "She went to bed early",
+      "date": "2025-12-30T04:02:28.980Z"
+    },
+    {
+      "id": "mkczwtp0ub7lr",
+      "author": "partner",
+      "type": "sleep_issues_observed",
+      "severity": 4,
+      "notes": "She went to bed early",
+      "date": "2025-12-29T23:17:28.980Z"
+    },
+    {
+      "id": "mkczwtp038uyz",
+      "author": "partner",
+      "type": "seemed_tired",
+      "severity": 4,
+      "notes": "She looked exhausted after work",
+      "date": "2026-01-02T04:04:28.980Z"
+    },
+    {
+      "id": "mkczwtp0lodl5",
+      "author": "partner",
+      "type": "mentioned_pain",
+      "severity": 1,
+      "notes": "She went to bed early",
+      "date": "2026-01-03T04:15:28.980Z"
+    },
+    {
+      "id": "mkczwtp04ujmg",
+      "author": "partner",
+      "type": "sleep_issues_observed",
+      "severity": 4,
+      "notes": "Seemed to feel better after lunch",
+      "date": "2026-01-04T23:34:28.980Z"
+    },
+    {
+      "id": "mkczwtp0zpe48",
+      "author": "partner",
+      "type": "mentioned_pain",
+      "severity": 4,
+      "notes": "Noticed she was quieter than usual",
+      "date": "2026-01-05T02:48:28.980Z"
+    },
+    {
+      "id": "mkczwtp0z2q7z",
+      "author": "partner",
+      "type": "low_energy",
+      "severity": 1,
+      "notes": "Seemed to feel better after lunch",
+      "date": "2026-01-06T03:21:28.980Z"
+    },
+    {
+      "id": "mkczwtp0sfpp8",
+      "author": "partner",
+      "type": "appetite_change",
+      "severity": 3,
+      "notes": "She went to bed early",
+      "date": "2026-01-06T03:13:28.980Z"
+    },
+    {
+      "id": "mkczwtp0ojvx9",
+      "author": "partner",
+      "type": "sleep_issues_observed",
+      "severity": 5,
+      "notes": "Seemed to feel better after lunch",
+      "date": "2026-01-10T01:35:28.980Z"
+    },
+    {
+      "id": "mkczwtp0585wx",
+      "author": "partner",
+      "type": "noticed_mood_change",
+      "severity": 4,
+      "notes": "She went to bed early",
+      "date": "2026-01-10T00:24:28.980Z"
+    },
+    {
+      "id": "mkczwtp06iy8o",
+      "author": "partner",
+      "type": "seemed_uncomfortable",
+      "severity": 2,
+      "notes": "Saw her rubbing her temples",
+      "date": "2026-01-13T00:07:28.980Z"
+    }
+  ]
+}

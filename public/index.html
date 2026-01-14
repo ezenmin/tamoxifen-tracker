@@ -1,0 +1,1543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tamoxifen Tracker</title>
+    <meta name="description" content="Track Tamoxifen side effects and share with your doctor">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#e91e8c">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #fdf2f8;
+            color: #333;
+            min-height: 100vh;
+        }
+        header {
+            background: linear-gradient(135deg, #e91e8c, #f472b6);
+            color: white;
+            padding: 1rem;
+            text-align: center;
+        }
+        header h1 { font-size: 1.5rem; }
+        main { padding: 1rem; max-width: 900px; margin: 0 auto; }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .card h2 {
+            font-size: 1.1rem;
+            margin-bottom: 0.75rem;
+            color: #e91e8c;
+        }
+
+        label { display: block; margin-bottom: 0.5rem; font-weight: 500; }
+        textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            font-size: 1rem;
+        }
+
+        .severity-group { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+        .severity-btn {
+            flex: 1;
+            padding: 0.5rem;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        .severity-btn.active { border-color: #e91e8c; background: #fdf2f8; }
+
+        button.primary {
+            width: 100%;
+            padding: 0.75rem;
+            background: #e91e8c;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        button.primary:hover { background: #d61a7e; }
+
+        .entry {
+            padding: 0.5rem;
+            border-bottom: 1px solid #eee;
+            font-size: 0.85rem;
+        }
+        .entry:last-child { border-bottom: none; }
+        .entry-header { display: flex; justify-content: space-between; }
+        .entry-type { font-weight: 600; text-transform: capitalize; }
+        .entry-severity { color: #e91e8c; }
+        .entry-date { font-size: 0.75rem; color: #666; }
+        .entry-notes { font-size: 0.8rem; color: #555; margin-top: 0.15rem; }
+
+        .tabs {
+            display: flex;
+            background: white;
+            border-radius: 12px;
+            padding: 0.25rem;
+            margin-bottom: 1rem;
+        }
+        .tab {
+            flex: 1;
+            padding: 0.75rem;
+            text-align: center;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            border-radius: 8px;
+        }
+        .tab.active { background: #e91e8c; color: white; }
+
+        #summary-output {
+            background: #f8f8f8;
+            padding: 1rem;
+            border-radius: 8px;
+            white-space: normal;
+            font-family: inherit;
+            font-size: 0.9rem;
+            line-height: 1.35;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 1rem;
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        /* Two-column layout */
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+        @media (max-width: 600px) {
+            .two-col { grid-template-columns: 1fr; }
+        }
+
+        /* Numbered effect list */
+        .effect-list {
+            list-style: none;
+            margin-bottom: 1rem;
+        }
+        .effect-item {
+            display: flex;
+            align-items: center;
+            padding: 0.5rem;
+            border: 2px solid #eee;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .effect-item:hover { border-color: #f472b6; background: #fef7fa; }
+        .effect-item.selected { border-color: #e91e8c; background: #fdf2f8; }
+        .hide-btn {
+            width: 20px;
+            height: 20px;
+            background: transparent;
+            color: #ccc;
+            border: none;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-right: 0.5rem;
+            padding: 0;
+        }
+        .hide-btn:hover { color: #e91e8c; background: #fef7fa; }
+        .effect-name { font-size: 0.95rem; }
+
+        /* Quick rating dots */
+        .effect-controls {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .rating-dots {
+            display: flex;
+            gap: 0.25rem;
+        }
+        .dot {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            border: 2px solid #ddd;
+            background: white;
+            cursor: pointer;
+            padding: 0;
+        }
+        .dot:hover { border-color: #f472b6; }
+        .dot.active { border-color: #e91e8c; background: #fdf2f8; }
+        .dot.logged { border-color: #16a34a; background: #16a34a; }
+        .dot.logging { pointer-events: none; opacity: 0.5; }
+
+        /* Inline inputs for special types */
+        .inline-input {
+            width: 120px;
+            padding: 0.4rem 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+        .inline-select {
+            width: 90px;
+            padding: 0.4rem 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            margin-bottom: 0;
+        }
+        .inline-btn {
+            padding: 0.45rem 0.6rem;
+            border-radius: 8px;
+            border: 1px solid #e91e8c;
+            background: #fdf2f8;
+            color: #e91e8c;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        .inline-btn:hover { background: #fef7fa; }
+
+        /* Name inputs + helper text */
+        .helper {
+            color: #666;
+            font-size: 0.85rem;
+            margin-top: -0.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        /* History table */
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+        .history-table th, .history-table td {
+            text-align: left;
+            padding: 0.5rem 0.25rem;
+            border-bottom: 1px solid #eee;
+            vertical-align: top;
+        }
+        .history-table th {
+            color: #666;
+            font-weight: 600;
+            font-size: 0.8rem;
+        }
+        .history-table td strong { font-weight: 600; }
+        .muted { color: #777; }
+
+        /* History column */
+        .history-col {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .history-col h3 {
+            font-size: 0.95rem;
+            color: #e91e8c;
+            margin-bottom: 0.5rem;
+        }
+
+        select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            font-size: 1rem;
+        }
+
+        /* Info tab styles */
+        .info-disclaimer {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+        }
+        .info-disclaimer p { margin-bottom: 0.5rem; font-size: 0.9rem; }
+        .info-disclaimer p:last-child { margin-bottom: 0; }
+
+        .info-warning {
+            border-left: 4px solid #ef4444;
+        }
+        .info-warning h2 { color: #dc2626; }
+
+        .info-subtitle {
+            color: #666;
+            font-size: 0.85rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .info-list {
+            list-style: none;
+            padding: 0;
+        }
+        .info-list li {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+        .info-list li:last-child { border-bottom: none; }
+        .info-list li strong { color: #333; }
+
+        .info-call-doctor {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            background: #fef2f2;
+            border-radius: 8px;
+            color: #dc2626;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .info-sources {
+            font-size: 0.85rem;
+            color: #666;
+        }
+        .info-sources a {
+            color: #e91e8c;
+            text-decoration: none;
+        }
+        .info-sources a:hover { text-decoration: underline; }
+
+        /* Menstrual section */
+        .menstrual-section {
+            margin-top: 1.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid #eee;
+        }
+        .menstrual-section h3 {
+            font-size: 0.95rem;
+            color: #dc2626;
+            margin-bottom: 0.75rem;
+        }
+        .menstrual-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        .menstrual-btn {
+            flex: 1;
+            min-width: 100px;
+            padding: 0.6rem 0.75rem;
+            border: 2px solid #fca5a5;
+            border-radius: 8px;
+            background: #fef2f2;
+            color: #dc2626;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .menstrual-btn:hover {
+            background: #fee2e2;
+            border-color: #f87171;
+        }
+        .menstrual-btn.spotting {
+            border-color: #fcd34d;
+            background: #fefce8;
+            color: #b45309;
+        }
+        .menstrual-btn.spotting:hover {
+            background: #fef9c3;
+            border-color: #fbbf24;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Tamoxifen Tracker</h1>
+    </header>
+
+    <main>
+        <div class="tabs">
+            <button class="tab" onclick="showTab('info')">Info</button>
+            <button class="tab active" onclick="showTab('log')"><span id="tab-log-label">Log</span></button>
+            <button class="tab" onclick="showTab('partner')"><span id="tab-partner-label">Partner</span></button>
+            <button class="tab" onclick="showTab('summary')">Summary</button>
+        </div>
+
+        <!-- Log Tab -->
+        <div id="tab-log" class="tab-content">
+            <div class="two-col">
+                <div class="card">
+                    <h2 id="log-title">Log Side Effect</h2>
+
+                    <label>Date</label>
+                    <input id="patient-log-date" class="inline-input" type="date" style="width:100%;margin-bottom:0.5rem;" />
+                    <div class="helper">Pick a day to add or edit that day’s ratings.</div>
+
+                    <label>Your name</label>
+                    <input id="patient-name" class="inline-input" style="width:100%;margin-bottom:0.5rem;" placeholder="e.g., Jane" />
+                    <div class="helper">Shown as <strong>Log (Name)</strong> for clarity.</div>
+
+                    <ul class="effect-list" id="effect-list"></ul>
+
+                    <label>Add a custom side effect</label>
+                    <input id="custom-effect-input" class="inline-input" style="width:100%;margin-bottom:0.5rem;" placeholder="e.g., Dry mouth" />
+                    <button class="inline-btn" style="width:100%;" onclick="addCustomType('patient')">Add</button>
+
+                    <div class="menstrual-section">
+                        <h3>Menstrual / Bleeding</h3>
+                        <div class="menstrual-buttons">
+                            <button class="menstrual-btn" onclick="logMenstrualEvent('period_started')">Period started</button>
+                            <button class="menstrual-btn" onclick="logMenstrualEvent('period_ended')">Period ended</button>
+                            <button class="menstrual-btn spotting" onclick="logMenstrualEvent('spotting')">Spotting / unexpected</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card history-col">
+                    <h3>Recent History</h3>
+                    <div id="history-table">
+                        <div class="empty-state">No entries yet</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Partner Tab -->
+        <div id="tab-partner" class="tab-content" style="display:none;">
+            <div class="two-col">
+                <div class="card">
+                    <h2 id="partner-title">Partner Observation</h2>
+
+                    <label>Date</label>
+                    <input id="partner-log-date" class="inline-input" type="date" style="width:100%;margin-bottom:0.5rem;" />
+                    <div class="helper">Pick a day to add or edit that day’s observations.</div>
+
+                    <label>Partner/Caregiver name</label>
+                    <input id="partner-name" class="inline-input" style="width:100%;margin-bottom:0.5rem;" placeholder="e.g., Alex" />
+                    <div class="helper">Shown as <strong>Partner (Name)</strong> for clarity.</div>
+
+                    <p style="color:#666;font-size:0.85rem;margin-bottom:0.75rem;">What did you notice?</p>
+                    <ul class="effect-list" id="partner-effect-list"></ul>
+
+                    <label>Add a custom observation</label>
+                    <input id="custom-partner-input" class="inline-input" style="width:100%;margin-bottom:0.5rem;" placeholder="e.g., Seemed dizzy" />
+                    <button class="inline-btn" style="width:100%;" onclick="addCustomType('partner')">Add</button>
+                </div>
+
+                <div class="card history-col">
+                    <h3>Recent History</h3>
+                    <div id="partner-history-table">
+                        <div class="empty-state">No observations yet</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary Tab -->
+        <div id="tab-summary" class="tab-content" style="display:none;">
+            <div class="card">
+                <h2>Summary for Doctor</h2>
+                <label>Time Period</label>
+                <select id="date-range" onchange="updateCharts()">
+                    <option value="7">Last 7 days</option>
+                    <option value="30" selected>Last 30 days</option>
+                    <option value="60">Last 60 days</option>
+                    <option value="all">All time</option>
+                </select>
+                <div id="summary-stats" style="margin-bottom:1rem;font-size:0.9rem;color:#666;"></div>
+            </div>
+
+            <div class="card">
+                <h2>Top 3 Symptoms by Highest Average Severity</h2>
+                <table class="history-table" id="top-symptoms-table">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Symptom</th>
+                            <th>Avg Severity</th>
+                            <th>Count</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <div class="card">
+                <h2>Overall Daily Severity</h2>
+                <p class="helper" style="margin-top:0;">Average of all logged symptoms that day (patient + partner)</p>
+                <div style="display:flex;flex-wrap:wrap;gap:1rem;align-items:center;margin-bottom:0.75rem;">
+                    <label style="display:flex;align-items:center;gap:0.25rem;font-size:0.85rem;cursor:pointer;">
+                        <input type="checkbox" id="show-patient-line" checked onchange="renderLineChart()" />
+                        <span style="color:#e91e8c;font-weight:600;">Patient</span>
+                    </label>
+                    <label style="display:flex;align-items:center;gap:0.25rem;font-size:0.85rem;cursor:pointer;">
+                        <input type="checkbox" id="show-partner-line" checked onchange="renderLineChart()" />
+                        <span style="color:#8b5cf6;font-weight:600;">Partner</span>
+                    </label>
+                    <span style="font-size:0.8rem;color:#666;margin-left:auto;">
+                        <span style="background:#fce7f3;padding:2px 6px;border-radius:3px;">Pink = menstrual period</span>
+                    </span>
+                </div>
+                <div style="padding-top:0.5rem;">
+                    <canvas id="line-chart" height="200"></canvas>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Symptom Trends (Patient)</h2>
+                <p class="helper" style="margin-top:0;">Select up to 5 symptoms to compare trends</p>
+                <div id="symptom-checkboxes" style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;"></div>
+                <div style="padding-top:0.5rem;">
+                    <canvas id="symptom-trend-chart" height="200"></canvas>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Text Summary</h2>
+                <p class="helper" style="margin-top:0;">Short, readable highlights (color-coded)</p>
+                <div id="summary-output" style="display:none;"></div>
+                <button class="primary" onclick="toggleTextSummary()">Show Text Summary</button>
+            </div>
+        </div>
+
+        <!-- Info Tab -->
+        <div id="tab-info" class="tab-content" style="display:none;">
+            <div class="card info-disclaimer">
+                <p><strong>⚠️ This information is for educational purposes only and is not medical advice.</strong></p>
+                <p>Always consult your doctor or pharmacist about your specific situation.</p>
+            </div>
+
+            <div class="card">
+                <h2>Common Side Effects</h2>
+                <p class="info-subtitle">Occur in more than 10% of patients</p>
+                <ul class="info-list">
+                    <li><strong>Hot flashes & night sweats</strong> — Sudden feelings of warmth, often with sweating</li>
+                    <li><strong>Vaginal discharge or dryness</strong> — Changes in vaginal secretions</li>
+                    <li><strong>Irregular periods</strong> — Changes in menstrual cycle or loss of periods</li>
+                    <li><strong>Nausea</strong> — Feeling sick to your stomach, especially when starting treatment</li>
+                    <li><strong>Fatigue & weakness</strong> — Feeling tired or having low energy</li>
+                    <li><strong>Mood changes</strong> — Depression, anxiety, or emotional changes</li>
+                    <li><strong>Weight gain or fluid retention</strong> — Edema (swelling), particularly in legs</li>
+                    <li><strong>Headaches</strong> — Mild to moderate head pain</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h2>Less Common Side Effects</h2>
+                <p class="info-subtitle">Occur in 1-10% of patients</p>
+                <ul class="info-list">
+                    <li><strong>Insomnia</strong> — Difficulty sleeping</li>
+                    <li><strong>Dizziness</strong> — Feeling lightheaded</li>
+                    <li><strong>Skin rash</strong> — Skin irritation or itching</li>
+                    <li><strong>Hair thinning</strong> — Partial hair loss (alopecia)</li>
+                    <li><strong>Abdominal pain</strong> — Stomach discomfort</li>
+                    <li><strong>Joint or muscle pain</strong> — Aches in joints and muscles</li>
+                    <li><strong>Changes in libido</strong> — Decreased sexual interest</li>
+                    <li><strong>Cataracts</strong> — Eye lens clouding (monitor vision)</li>
+                </ul>
+            </div>
+
+            <div class="card info-warning">
+                <h2>⚠️ Rare but Serious Side Effects</h2>
+                <p class="info-subtitle">Occur in less than 1% — Require immediate medical attention</p>
+                <ul class="info-list">
+                    <li><strong>Blood clots (DVT)</strong> — Deep vein thrombosis; watch for leg pain, swelling, warmth, or redness</li>
+                    <li><strong>Pulmonary embolism</strong> — Blood clot in lungs; sudden shortness of breath, chest pain</li>
+                    <li><strong>Stroke</strong> — Sudden numbness, confusion, trouble speaking, severe headache</li>
+                    <li><strong>Uterine/endometrial cancer</strong> — Unusual vaginal bleeding; report any bleeding to doctor</li>
+                    <li><strong>Severe allergic reaction</strong> — Difficulty breathing, swelling of face/throat</li>
+                    <li><strong>Vision problems</strong> — Blurred vision, retinal changes, color vision changes</li>
+                    <li><strong>Liver problems</strong> — Yellowing of skin/eyes, dark urine, severe fatigue</li>
+                </ul>
+                <p class="info-call-doctor">Seek immediate medical care if you experience any of these symptoms.</p>
+            </div>
+
+            <div class="card">
+                <h2>Who Should Not Take Tamoxifen</h2>
+                <ul class="info-list">
+                    <li><strong>Pregnant women</strong> — Tamoxifen may cause birth defects; use non-hormonal contraception during treatment and 2 months after</li>
+                    <li><strong>Breastfeeding women</strong> — Drug accumulates in breast milk; avoid during treatment and 3 months after</li>
+                    <li><strong>Known allergy</strong> — Previous allergic reaction to tamoxifen or its components</li>
+                    <li><strong>Taking warfarin</strong> — Concurrent warfarin use is contraindicated</li>
+                    <li><strong>History of blood clots</strong> — Prior DVT or pulmonary embolism (for prevention use; may still be appropriate for cancer treatment)</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h2>Drug Interactions</h2>
+                <p class="info-subtitle">Discuss all medications with your doctor</p>
+                <ul class="info-list">
+                    <li><strong>CYP2D6 inhibitors</strong> — Paroxetine (Paxil), fluoxetine (Prozac), and some SSRIs reduce tamoxifen effectiveness</li>
+                    <li><strong>Warfarin</strong> — Increases bleeding risk; contraindicated together</li>
+                    <li><strong>Aromatase inhibitors</strong> — Anastrozole, letrozole; should not be used together</li>
+                    <li><strong>Rifampin</strong> — Significantly reduces tamoxifen levels</li>
+                    <li><strong>Cytotoxic agents</strong> — May increase thromboembolic risk</li>
+                </ul>
+                <h3 style="margin-top:1rem;font-size:0.95rem;">Foods/Beverages to Avoid</h3>
+                <ul class="info-list">
+                    <li><strong>Grapefruit & tangerines</strong> — May interfere with drug metabolism</li>
+                    <li><strong>Alcohol</strong> — May reduce effectiveness and increase side effects</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h2>Sources</h2>
+                <p class="info-sources">
+                    Information compiled from authoritative medical sources:<br><br>
+                    <a href="https://www.accessdata.fda.gov/drugsatfda_docs/label/2018/021807s005lbl.pdf" target="_blank">FDA Drug Label</a> |
+                    <a href="https://my.clevelandclinic.org/health/treatments/9785-tamoxifen" target="_blank">Cleveland Clinic</a> |
+                    <a href="https://www.ncbi.nlm.nih.gov/books/NBK532905/" target="_blank">NCBI StatPearls</a>
+                </p>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="tracker.js"></script>
+    <script>
+        // Side effect types with display names
+        const EFFECT_TYPES = [
+            { value: 'hot_flashes', label: 'Hot Flashes' },
+            { value: 'joint_pain', label: 'Joint Pain' },
+            { value: 'muscle_pain', label: 'Muscle Pain' },
+            { value: 'fatigue', label: 'Fatigue' },
+            { value: 'mood_changes', label: 'Mood Changes' },
+            { value: 'nausea', label: 'Nausea' },
+            { value: 'headaches', label: 'Headaches' },
+            { value: 'sleep_problems', label: 'Sleep disturbance' },
+            { value: 'weight_changes', label: 'Body weight' }
+        ];
+
+        const PARTNER_TYPES = [
+            { value: 'noticed_mood_change', label: 'Noticed Mood Change' },
+            { value: 'seemed_tired', label: 'Seemed Tired' },
+            { value: 'mentioned_pain', label: 'Mentioned Pain' },
+            { value: 'sleep_issues_observed', label: 'Sleep Issues' },
+            { value: 'appetite_change', label: 'Appetite Change' },
+            { value: 'low_energy', label: 'Low Energy' },
+            { value: 'seemed_uncomfortable', label: 'Seemed Uncomfortable' }
+        ];
+
+        // Names
+        const PATIENT_NAME_KEY = 'tamoxifen-patient-name';
+        const PARTNER_NAME_KEY = 'tamoxifen-partner-name';
+
+        // Custom types
+        const CUSTOM_PATIENT_TYPES_KEY = 'tamoxifen-custom-effect-types';
+        const CUSTOM_PARTNER_TYPES_KEY = 'tamoxifen-custom-partner-types';
+
+        // Hidden types
+        const HIDDEN_PATIENT_TYPES_KEY = 'tamoxifen-hidden-effect-types';
+        const HIDDEN_PARTNER_TYPES_KEY = 'tamoxifen-hidden-partner-types';
+
+        // State
+        let selectedEffectType = 'hot_flashes';
+        let selectedPartnerType = 'noticed_mood_change';
+
+        // Selected dates (for logging/editing historical days)
+        function toDateInputValue(d) {
+            const x = new Date(d);
+            const y = x.getFullYear();
+            const m = String(x.getMonth() + 1).padStart(2, '0');
+            const day = String(x.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        }
+
+        function getSelectedLogDate(kind) {
+            const id = kind === 'partner' ? 'partner-log-date' : 'patient-log-date';
+            const el = document.getElementById(id);
+            const raw = (el && el.value) ? el.value : '';
+
+            // Use local noon to avoid timezone shifting the day when converting to ISO.
+            if (raw) return new Date(`${raw}T12:00:00`);
+            return new Date();
+        }
+
+        function getCustomTypes(kind) {
+            const key = kind === 'partner' ? CUSTOM_PARTNER_TYPES_KEY : CUSTOM_PATIENT_TYPES_KEY;
+            const raw = localStorage.getItem(key);
+            return raw ? JSON.parse(raw) : [];
+        }
+
+        function saveCustomTypes(kind, types) {
+            const key = kind === 'partner' ? CUSTOM_PARTNER_TYPES_KEY : CUSTOM_PATIENT_TYPES_KEY;
+            localStorage.setItem(key, JSON.stringify(types));
+        }
+
+        function getHiddenTypes(kind) {
+            const key = kind === 'partner' ? HIDDEN_PARTNER_TYPES_KEY : HIDDEN_PATIENT_TYPES_KEY;
+            const raw = localStorage.getItem(key);
+            return raw ? JSON.parse(raw) : [];
+        }
+
+        function saveHiddenTypes(kind, types) {
+            const key = kind === 'partner' ? HIDDEN_PARTNER_TYPES_KEY : HIDDEN_PATIENT_TYPES_KEY;
+            localStorage.setItem(key, JSON.stringify(types));
+        }
+
+        function hideType(kind, value) {
+            const hidden = getHiddenTypes(kind);
+            if (!hidden.includes(value)) {
+                hidden.push(value);
+                saveHiddenTypes(kind, hidden);
+            }
+            buildEffectList(kind === 'partner' ? 'partner-effect-list' : 'effect-list', kind);
+        }
+
+        function slugifyLabel(label) {
+            return label
+                .trim()
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '_')
+                .replace(/^_+|_+$/g, '')
+                .slice(0, 40);
+        }
+
+        function getAllTypes(kind) {
+            const base = kind === 'partner' ? PARTNER_TYPES : EFFECT_TYPES;
+            const custom = getCustomTypes(kind);
+            const hidden = getHiddenTypes(kind);
+            const all = [...base, ...custom].filter(t => !hidden.includes(t.value));
+            // Move weight_changes to end for patient
+            if (kind !== 'partner') {
+                const weightIdx = all.findIndex(t => t.value === 'weight_changes');
+                if (weightIdx > -1) {
+                    const [weight] = all.splice(weightIdx, 1);
+                    all.push(weight);
+                }
+            }
+            return all;
+        }
+
+        // Build effect lists with inline controls
+        function buildEffectList(containerId, kind) {
+            const container = document.getElementById(containerId);
+            const types = getAllTypes(kind);
+            const selectedValue = kind === 'partner' ? selectedPartnerType : selectedEffectType;
+
+            const selectedDate = getSelectedLogDate(kind);
+            const dayStart = startOfDay(selectedDate);
+            const dayEnd = endOfDay(selectedDate);
+            const existing = kind === 'partner' ? getPartnerObservations() : getEntries();
+
+            container.innerHTML = types.map((t) => {
+                if (t.value === 'weight_changes' && kind !== 'partner') {
+                    return `
+                        <li class="effect-item ${t.value === selectedValue ? 'selected' : ''}" data-value="${t.value}">
+                            <button class="hide-btn" onclick="event.stopPropagation(); hideType('${kind}', '${t.value}')" title="Hide">×</button>
+                            <span class="effect-name">${t.label}</span>
+                            <span class="effect-controls" onclick="event.stopPropagation();">
+                                <input id="weight-value" class="inline-input" type="number" step="0.1" placeholder="Number" />
+                                <select id="weight-unit" class="inline-select">
+                                    <option value="kg">kg</option>
+                                    <option value="lb">lb</option>
+                                </select>
+                                <button class="inline-btn" onclick="logWeightChange()">Log</button>
+                            </span>
+                        </li>
+                    `;
+                }
+
+                const onclickFn = kind === 'partner' ? 'quickRatePartner' : 'quickRatePatient';
+
+                const existingEntry = (existing || []).find(e =>
+                    e.type === t.value &&
+                    !e.event &&
+                    e.severity != null &&
+                    new Date(e.date) >= dayStart &&
+                    new Date(e.date) <= dayEnd
+                );
+                const existingSeverity = existingEntry ? existingEntry.severity : null;
+                return `
+                    <li class="effect-item ${t.value === selectedValue ? 'selected' : ''}" data-value="${t.value}">
+                        <button class="hide-btn" onclick="event.stopPropagation(); hideType('${kind}', '${t.value}')" title="Hide">×</button>
+                        <span class="effect-name">${t.label}</span>
+                        <span class="effect-controls" onclick="event.stopPropagation();">
+                            <span class="rating-dots">
+                                ${[1,2,3,4,5].map(n => {
+                                    const cls = existingSeverity === n ? 'dot logged' : 'dot';
+                                    return `<button class=\"${cls}\" title=\"${n}\" onclick=\"${onclickFn}('${t.value}', ${n}, event)\"></button>`;
+                                }).join('')}
+                            </span>
+                        </span>
+                    </li>
+                `;
+            }).join('');
+        }
+
+        function selectEffect(containerId, value) {
+            document.querySelectorAll(`#${containerId} .effect-item`).forEach(el => {
+                el.classList.toggle('selected', el.dataset.value === value);
+            });
+            if (containerId === 'effect-list') {
+                selectedEffectType = value;
+            } else {
+                selectedPartnerType = value;
+            }
+        }
+
+        // Default selected dates to today
+        document.getElementById('patient-log-date').value = toDateInputValue(new Date());
+        document.getElementById('partner-log-date').value = toDateInputValue(new Date());
+        document.getElementById('patient-log-date').addEventListener('change', () => buildEffectList('effect-list', 'patient'));
+        document.getElementById('partner-log-date').addEventListener('change', () => buildEffectList('partner-effect-list', 'partner'));
+
+        // Initialize lists
+        buildEffectList('effect-list', 'patient');
+        buildEffectList('partner-effect-list', 'partner');
+
+        // Names
+        function getName(key) {
+            return (localStorage.getItem(key) || '').trim();
+        }
+
+        function setName(key, value) {
+            localStorage.setItem(key, (value || '').trim());
+        }
+
+        function updateTabLabels() {
+            const patientName = getName(PATIENT_NAME_KEY);
+            const partnerName = getName(PARTNER_NAME_KEY);
+
+            document.getElementById('tab-log-label').textContent = patientName ? `Log (${patientName})` : 'Log';
+            document.getElementById('tab-partner-label').textContent = partnerName ? `Partner (${partnerName})` : 'Partner';
+
+            const logTitle = document.getElementById('log-title');
+            const partnerTitle = document.getElementById('partner-title');
+            logTitle.textContent = patientName ? `Log Side Effect (${patientName})` : 'Log Side Effect';
+            partnerTitle.textContent = partnerName ? `Partner Observation (${partnerName})` : 'Partner Observation';
+        }
+
+        // Load entries from localStorage
+        function getEntries() {
+            const data = localStorage.getItem('tamoxifen-entries');
+            return data ? JSON.parse(data) : [];
+        }
+
+        function saveEntries(entries) {
+            localStorage.setItem('tamoxifen-entries', JSON.stringify(entries));
+        }
+
+        function getPartnerObservations() {
+            const data = localStorage.getItem('tamoxifen-partner-observations');
+            return data ? JSON.parse(data) : [];
+        }
+
+        function savePartnerObservations(observations) {
+            localStorage.setItem('tamoxifen-partner-observations', JSON.stringify(observations));
+        }
+
+        // Add custom types
+        function addCustomType(kind) {
+            const inputId = kind === 'partner' ? 'custom-partner-input' : 'custom-effect-input';
+            const input = document.getElementById(inputId);
+            const label = (input.value || '').trim();
+            if (!label) return;
+
+            const value = `custom_${slugifyLabel(label)}`;
+            if (!value || value === 'custom_') return;
+
+            const existing = getAllTypes(kind);
+            if (existing.some(t => t.value === value)) {
+                input.value = '';
+                return;
+            }
+
+            const custom = getCustomTypes(kind);
+            custom.push({ value, label });
+            saveCustomTypes(kind, custom);
+            input.value = '';
+
+            buildEffectList(kind === 'partner' ? 'partner-effect-list' : 'effect-list', kind);
+            if (kind === 'partner') renderPartnerHistory(); else renderHistory();
+        }
+
+        // Tab switching
+        function showTab(name) {
+            document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById('tab-' + name).style.display = 'block';
+            document.querySelector(`.tab[onclick="showTab('${name}')"]`).classList.add('active');
+
+            if (name === 'log') renderHistory();
+            if (name === 'partner') renderPartnerHistory();
+            if (name === 'summary') updateCharts();
+        }
+
+        function quickRatePatient(type, severity, evt) {
+            const dot = evt && evt.target;
+            if (dot && dot.classList.contains('logging')) return; // Prevent double-click
+
+            try {
+                if (dot) dot.classList.add('logging');
+
+                const entries = getEntries();
+                const selectedDate = getSelectedLogDate('patient');
+                const todayStart = startOfDay(selectedDate);
+                const todayEnd = endOfDay(selectedDate);
+
+                // Find existing today entry for this type
+                const existingIdx = entries.findIndex(e =>
+                    e.type === type &&
+                    !e.event &&
+                    new Date(e.date) >= todayStart &&
+                    new Date(e.date) <= todayEnd
+                );
+
+                if (existingIdx >= 0) {
+                    // Update existing entry
+                    entries[existingIdx].severity = severity;
+                    entries[existingIdx].date = selectedDate.toISOString();
+                } else {
+                    // Create new entry
+                    const entry = createEntry(type, severity, '');
+                    entry.author = 'patient';
+                    entry.date = selectedDate.toISOString();
+                    entries.unshift(entry);
+                }
+                entries.sort((a, b) => new Date(b.date) - new Date(a.date));
+                saveEntries(entries);
+                renderHistory();
+                buildEffectList('effect-list', 'patient');
+
+                // Clear other dots in same row, set this one green
+                if (dot) {
+                    const row = dot.closest('.effect-item');
+                    if (row) row.querySelectorAll('.dot').forEach(d => d.classList.remove('logged'));
+                    dot.classList.remove('logging');
+                    dot.classList.add('logged');
+                }
+            } catch (e) {
+                if (dot) dot.classList.remove('logging');
+                alert(e.message);
+            }
+        }
+
+        function quickRatePartner(type, severity, evt) {
+            const dot = evt && evt.target;
+            if (dot && dot.classList.contains('logging')) return; // Prevent double-click
+
+            try {
+                if (dot) dot.classList.add('logging');
+
+                const observations = getPartnerObservations();
+                const selectedDate = getSelectedLogDate('partner');
+                const todayStart = startOfDay(selectedDate);
+                const todayEnd = endOfDay(selectedDate);
+
+                // Find existing today entry for this type
+                const existingIdx = observations.findIndex(e =>
+                    e.type === type &&
+                    new Date(e.date) >= todayStart &&
+                    new Date(e.date) <= todayEnd
+                );
+
+                if (existingIdx >= 0) {
+                    // Update existing entry
+                    observations[existingIdx].severity = severity;
+                    observations[existingIdx].date = selectedDate.toISOString();
+                } else {
+                    // Create new entry
+                    const observation = createPartnerObservation(type, severity, '');
+                    observation.date = selectedDate.toISOString();
+                    observations.unshift(observation);
+                }
+                observations.sort((a, b) => new Date(b.date) - new Date(a.date));
+                savePartnerObservations(observations);
+                renderPartnerHistory();
+                buildEffectList('partner-effect-list', 'partner');
+
+                // Clear other dots in same row, set this one green
+                if (dot) {
+                    const row = dot.closest('.effect-item');
+                    if (row) row.querySelectorAll('.dot').forEach(d => d.classList.remove('logged'));
+                    dot.classList.remove('logging');
+                    dot.classList.add('logged');
+                }
+            } catch (e) {
+                if (dot) dot.classList.remove('logging');
+                alert(e.message);
+            }
+        }
+
+        function logMenstrualEvent(type) {
+            try {
+                const entry = createEventEntry(type, '');
+                entry.author = 'patient';
+                const entries = getEntries();
+                entry.date = getSelectedLogDate('patient').toISOString();
+                entries.unshift(entry);
+                entries.sort((a, b) => new Date(b.date) - new Date(a.date));
+                saveEntries(entries);
+                renderHistory();
+
+                const summaryTab = document.getElementById('tab-summary');
+                if (summaryTab && summaryTab.style.display !== 'none') updateCharts();
+            } catch (e) {
+                alert(e.message);
+            }
+        }
+
+        function logWeightChange() {
+            const valueRaw = (document.getElementById('weight-value').value || '').trim();
+            if (!valueRaw) {
+                alert('Enter a number to log a weight change.');
+                return;
+            }
+
+            const unit = document.getElementById('weight-unit').value;
+            const notes = `${valueRaw} ${unit}`;
+            try {
+                const entry = createEventEntry('weight_changes', notes);
+                entry.author = 'patient';
+                const entries = getEntries();
+                entry.date = getSelectedLogDate('patient').toISOString();
+                entries.unshift(entry);
+                entries.sort((a, b) => new Date(b.date) - new Date(a.date));
+                saveEntries(entries);
+                document.getElementById('weight-value').value = '';
+                renderHistory();
+            } catch (e) {
+                alert(e.message);
+            }
+        }
+
+        function startOfDay(d) {
+            const x = new Date(d);
+            x.setHours(0, 0, 0, 0);
+            return x;
+        }
+
+        function endOfDay(d) {
+            const x = new Date(d);
+            x.setHours(23, 59, 59, 999);
+            return x;
+        }
+
+        function avgSeverity(entries) {
+            if (!entries || entries.length === 0) return null;
+            const sum = entries.reduce((s, e) => s + (e.severity || 0), 0);
+            return sum / entries.length;
+        }
+
+        function buildHistoryTable(containerId, entries, types, includeEvents) {
+            const container = document.getElementById(containerId);
+
+            if (!entries || entries.length === 0) {
+                container.innerHTML = '<div class="empty-state">No entries yet</div>';
+                return;
+            }
+
+            const now = new Date();
+            const todayStart = startOfDay(now);
+            const todayEnd = endOfDay(now);
+
+            const yesterday = new Date(now);
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yStart = startOfDay(yesterday);
+            const yEnd = endOfDay(yesterday);
+
+            const prev7End = endOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2));
+            const prev7Start = startOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 8));
+
+            const allTypes = types;
+
+            const rows = allTypes.map(t => {
+                const todayEntries = entries.filter(e => e.type === t.value && new Date(e.date) >= todayStart && new Date(e.date) <= todayEnd);
+                const yEntries = entries.filter(e => e.type === t.value && new Date(e.date) >= yStart && new Date(e.date) <= yEnd);
+                const prevEntries = entries.filter(e => e.type === t.value && new Date(e.date) >= prev7Start && new Date(e.date) <= prev7End);
+
+                // Special handling for weight_changes - show notes (weight values) instead of severity
+                if (t.value === 'weight_changes') {
+                    const tWeights = todayEntries.filter(e => e.notes).map(e => e.notes);
+                    const yWeights = yEntries.filter(e => e.notes).map(e => e.notes);
+                    const pWeights = prevEntries.filter(e => e.notes).map(e => e.notes);
+
+                    const tText = tWeights.length === 0 ? '<span class="muted">-</span>' : `<strong>${tWeights[tWeights.length - 1]}</strong>`;
+                    const yText = yWeights.length === 0 ? '<span class="muted">-</span>' : `<strong>${yWeights[yWeights.length - 1]}</strong>`;
+                    const pText = pWeights.length === 0 ? '<span class="muted">-</span>' : `<strong>${pWeights[pWeights.length - 1]}</strong> <span class="muted">(${pWeights.length})</span>`;
+
+                    return `
+                        <tr>
+                            <td>${t.label}</td>
+                            <td>${tText}</td>
+                            <td>${yText}</td>
+                            <td>${pText}</td>
+                        </tr>
+                    `;
+                }
+
+                const tAvg = avgSeverity(todayEntries);
+                const yAvg = avgSeverity(yEntries);
+                const pAvg = avgSeverity(prevEntries);
+
+                const tText = tAvg === null ? '<span class="muted">-</span>' : `<strong>${tAvg.toFixed(1)}</strong>`;
+                const yText = yAvg === null ? '<span class="muted">-</span>' : `<strong>${yAvg.toFixed(1)}</strong>`;
+                const pText = pAvg === null ? '<span class="muted">-</span>' : `<strong>${pAvg.toFixed(1)}</strong> <span class="muted">(${prevEntries.length})</span>`;
+
+                return `
+                    <tr>
+                        <td>${t.label}</td>
+                        <td>${tText}</td>
+                        <td>${yText}</td>
+                        <td>${pText}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            let eventRows = '';
+            if (includeEvents) {
+                const eventTypes = [
+                    { type: 'period_started', label: 'Period started', color: '#e91e8c' },
+                    { type: 'period_ended', label: 'Period ended', color: '#e91e8c' },
+                    { type: 'spotting', label: 'Spotting', color: '#dc2626' }
+                ];
+
+                const fmt = (n) => (n && n > 0) ? `<strong>${n}</strong>` : '<span class="muted">-</span>';
+
+                eventRows = `
+                    <tr>
+                        <td colspan="4" class="muted" style="padding-top:0.75rem;"><strong>Events</strong></td>
+                    </tr>
+                    ${eventTypes.map(et => {
+                        const tToday = entries.filter(e => e.event === true && e.type === et.type && new Date(e.date) >= todayStart && new Date(e.date) <= todayEnd).length;
+                        const tY = entries.filter(e => e.event === true && e.type === et.type && new Date(e.date) >= yStart && new Date(e.date) <= yEnd).length;
+                        const tPrev = entries.filter(e => e.event === true && e.type === et.type && new Date(e.date) >= prev7Start && new Date(e.date) <= prev7End).length;
+                        return `
+                            <tr>
+                                <td><span style="color:${et.color};font-weight:600;">${et.label}</span></td>
+                                <td>${fmt(tToday)}</td>
+                                <td>${fmt(tY)}</td>
+                                <td>${fmt(tPrev)}</td>
+                            </tr>
+                        `;
+                    }).join('')}
+                `;
+            }
+
+            container.innerHTML = `
+                <table class="history-table">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th>Today</th>
+                            <th>Yesterday</th>
+                            <th>Prev 7 days</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows}
+                        ${eventRows}
+                    </tbody>
+                </table>
+                <div class="helper">Numbers are average severity (1=mild, 5=severe). Weight shows most recent value.</div>
+            `;
+        }
+
+        // Render history (table)
+        function renderHistory() {
+            const entries = getEntries();
+            buildHistoryTable('history-table', entries, getAllTypes('patient'), true);
+        }
+
+        // Chart instances
+        let lineChart = null;
+        let symptomTrendChart = null;
+        let selectedSymptomTypes = [];
+        let symptomSelectionUserSet = false;
+        let cachedLineChartData = null;
+        let cachedMenstrualPeriods = [];
+
+        function dateInRange(dateStr, start, end) {
+            if (!dateStr || !start || !end) return false;
+            return dateStr >= start && dateStr <= end;
+        }
+
+        function getDateLabelColor(dateStr) {
+            if (!dateStr) return '#666';
+
+            // Spotting overrides period
+            const hasSpotting = cachedMenstrualPeriods.some(p => p.type === 'spotting' && p.start === dateStr);
+            if (hasSpotting) return '#dc2626';
+
+            const inPeriod = cachedMenstrualPeriods.some(p => p.type === 'period' && dateInRange(dateStr, p.start, p.end));
+            if (inPeriod) return '#e91e8c';
+
+            return '#666';
+        }
+
+        // Colors for symptom trend lines
+        const SYMPTOM_COLORS = [
+            '#e91e8c', '#8b5cf6', '#f59e0b', '#10b981', '#3b82f6',
+            '#ef4444', '#6366f1', '#14b8a6', '#f97316', '#84cc16'
+        ];
+
+        // Calculate menstrual period ranges from entries
+        function getMenstrualPeriods(entries) {
+            const menstrualEvents = entries
+                .filter(e => e.event && ['period_started', 'period_ended', 'spotting'].includes(e.type))
+                .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            const periods = [];
+            let currentPeriodStart = null;
+
+            menstrualEvents.forEach(e => {
+                const dateStr = e.date.split('T')[0];
+                if (e.type === 'period_started') {
+                    currentPeriodStart = dateStr;
+                } else if (e.type === 'period_ended' && currentPeriodStart) {
+                    periods.push({ start: currentPeriodStart, end: dateStr, type: 'period' });
+                    currentPeriodStart = null;
+                } else if (e.type === 'spotting') {
+                    periods.push({ start: dateStr, end: dateStr, type: 'spotting' });
+                }
+            });
+
+            // If period started but not ended, extend to today or last entry
+            if (currentPeriodStart) {
+                periods.push({ start: currentPeriodStart, end: new Date().toISOString().split('T')[0], type: 'period' });
+            }
+
+            return periods;
+        }
+
+        function updateCharts() {
+            const days = document.getElementById('date-range').value;
+            const patientEntries = getEntries();
+            const partnerObservations = getPartnerObservations();
+
+            const chartData = getChartData(patientEntries, partnerObservations, days);
+
+            const statsEl = document.getElementById('summary-stats');
+            statsEl.textContent = `Patient entries: ${chartData.totalPatient} | Partner observations: ${chartData.totalPartner}`;
+
+            // Render top symptoms table
+            renderTopSymptomsTable(patientEntries, days);
+
+            // Calculate menstrual periods and cache data
+            cachedLineChartData = chartData.lineData;
+            cachedMenstrualPeriods = getMenstrualPeriods(patientEntries);
+
+            // Render overall daily severity line chart
+            renderLineChart();
+
+            // Build symptom checkboxes and render trend chart
+            if (!symptomSelectionUserSet) {
+                const top3 = getTopSymptomsByAvgSeverity(patientEntries, days, 3);
+                selectedSymptomTypes = top3.map(s => s.type);
+            }
+            buildSymptomCheckboxes(patientEntries, days);
+            renderSymptomTrendChart(patientEntries, days);
+        }
+
+        function renderTopSymptomsTable(entries, days) {
+            const top3 = getTopSymptomsByAvgSeverity(entries, days, 3);
+            const tbody = document.querySelector('#top-symptoms-table tbody');
+
+            if (top3.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="muted" style="text-align:center;">No symptom data for this period</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = top3.map((s, i) => {
+                const label = s.type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                return `
+                    <tr>
+                        <td><strong>#${i + 1}</strong></td>
+                        <td>${label}</td>
+                        <td><strong>${s.avgSeverity.toFixed(1)}</strong>/5</td>
+                        <td>${s.count} entries</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function buildSymptomCheckboxes(entries, days) {
+            const container = document.getElementById('symptom-checkboxes');
+            const top3 = getTopSymptomsByAvgSeverity(entries, days, 3);
+
+            // Get all unique symptom types from entries (excluding events and menstrual)
+            const menstrualTypes = ['period_started', 'period_ended', 'spotting', 'weight_changes'];
+            const allSymptomTypes = [...new Set(
+                entries
+                    .filter(e => !e.event && e.severity != null && !menstrualTypes.includes(e.type))
+                    .map(e => e.type)
+            )].sort();
+
+            // Default selected: top 3 by severity
+            if (selectedSymptomTypes.length === 0) selectedSymptomTypes = top3.map(s => s.type);
+
+            container.innerHTML = allSymptomTypes.map(type => {
+                const label = type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                const checked = selectedSymptomTypes.includes(type) ? 'checked' : '';
+                return `
+                    <label style="display:flex;align-items:center;gap:0.25rem;font-size:0.85rem;cursor:pointer;">
+                        <input type="checkbox" value="${type}" ${checked} onchange="onSymptomCheckboxChange(this)" />
+                        ${label}
+                    </label>
+                `;
+            }).join('');
+        }
+
+        function onSymptomCheckboxChange(checkbox) {
+            symptomSelectionUserSet = true;
+            const type = checkbox.value;
+            if (checkbox.checked) {
+                if (selectedSymptomTypes.length >= 5) {
+                    checkbox.checked = false;
+                    alert('Maximum 5 symptoms can be selected');
+                    return;
+                }
+                selectedSymptomTypes.push(type);
+            } else {
+                selectedSymptomTypes = selectedSymptomTypes.filter(t => t !== type);
+            }
+            const days = document.getElementById('date-range').value;
+            renderSymptomTrendChart(getEntries(), days);
+        }
+
+        function renderSymptomTrendChart(entries, days) {
+            const ctx = document.getElementById('symptom-trend-chart').getContext('2d');
+            if (symptomTrendChart) symptomTrendChart.destroy();
+
+            if (selectedSymptomTypes.length === 0) {
+                symptomTrendChart = new Chart(ctx, {
+                    type: 'line',
+                    data: { labels: [], datasets: [] },
+                    options: { responsive: true, layout: { padding: { top: 10 } } }
+                });
+                return;
+            }
+
+            const trendData = getSymptomTrendData(entries, days, selectedSymptomTypes);
+
+            const datasets = selectedSymptomTypes.map((type, idx) => {
+                const label = type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                return {
+                    label: label,
+                    data: trendData.seriesByType[type],
+                    borderColor: SYMPTOM_COLORS[idx % SYMPTOM_COLORS.length],
+                    backgroundColor: SYMPTOM_COLORS[idx % SYMPTOM_COLORS.length],
+                    tension: 0.3,
+                    spanGaps: true,
+                    pointRadius: 3
+                };
+            });
+
+            const config = {
+                type: 'line',
+                data: { labels: trendData.labels, datasets },
+                options: {
+                    responsive: true,
+                    layout: { padding: { top: 18, bottom: 10, left: 6, right: 6 } },
+                    plugins: { legend: { position: 'top' } },
+                    scales: {
+                        y: { min: 0, max: 5.2, ticks: { stepSize: 1, callback: (v) => v <= 5 ? v : null } },
+                        x: {
+                            ticks: {
+                                color: (ctx) => {
+                                    const idx = typeof ctx.index === 'number' ? ctx.index : null;
+                                    const rawDate = (idx != null && trendData.rawDates) ? trendData.rawDates[idx] : null;
+                                    return getDateLabelColor(rawDate);
+                                }
+                            }
+                        }
+                    }
+                },
+                plugins: [menstrualBackgroundPlugin]
+            };
+
+            // Attach menstrual data to config for plugin access
+            config._menstrualData = { rawDates: trendData.rawDates, periods: cachedMenstrualPeriods };
+
+            symptomTrendChart = new Chart(ctx, config);
+        }
+
+        // Custom Chart.js plugin to draw pink background for menstrual periods
+        const menstrualBackgroundPlugin = {
+            id: 'menstrualBackground',
+            beforeDraw: (chart) => {
+                const ctx = chart.ctx;
+                const chartArea = chart.chartArea;
+                const xScale = chart.scales.x;
+                const data = chart.config._menstrualData;
+
+                if (!data || !data.rawDates || !data.periods) return;
+                if (data.rawDates.length < 2) return;
+
+                const step = xScale.getPixelForValue(1) - xScale.getPixelForValue(0);
+
+                data.periods.forEach(period => {
+                    // Find indices for start and end dates
+                    let startIdx = data.rawDates.indexOf(period.start);
+                    let endIdx = data.rawDates.indexOf(period.end);
+
+                    // If exact dates not found, find nearest
+                    if (startIdx === -1) {
+                        for (let i = 0; i < data.rawDates.length; i++) {
+                            if (data.rawDates[i] >= period.start) { startIdx = i; break; }
+                        }
+                    }
+                    if (endIdx === -1) {
+                        for (let i = data.rawDates.length - 1; i >= 0; i--) {
+                            if (data.rawDates[i] <= period.end) { endIdx = i; break; }
+                        }
+                    }
+
+                    if (startIdx === -1 || endIdx === -1 || startIdx > endIdx) return;
+
+                    const x1 = xScale.getPixelForValue(startIdx) - step / 2;
+                    const x2 = xScale.getPixelForValue(endIdx) + step / 2;
+
+                    ctx.save();
+                    // Period = pink background, Spotting = light red
+                    ctx.fillStyle = period.type === 'spotting' ? 'rgba(220, 38, 38, 0.08)' : 'rgba(233, 30, 140, 0.12)';
+                    ctx.fillRect(x1, chartArea.top, x2 - x1, chartArea.bottom - chartArea.top);
+                    ctx.restore();
+                });
+            }
+        };
+
+        function renderLineChart() {
+            const ctx = document.getElementById('line-chart').getContext('2d');
+            if (lineChart) lineChart.destroy();
+
+            const data = cachedLineChartData;
+            if (!data) return;
+
+            const showPatient = document.getElementById('show-patient-line').checked;
+            const showPartner = document.getElementById('show-partner-line').checked;
+
+            const datasets = [];
+            if (showPatient) {
+                datasets.push({ label: 'Patient', data: data.patientData, borderColor: '#e91e8c', backgroundColor: '#e91e8c', tension: 0.3, spanGaps: true, pointRadius: 4 });
+            }
+            if (showPartner) {
+                datasets.push({ label: 'Partner', data: data.partnerData, borderColor: '#8b5cf6', backgroundColor: '#8b5cf6', tension: 0.3, spanGaps: true, pointRadius: 4 });
+            }
+
+            const config = {
+                type: 'line',
+                data: { labels: data.labels, datasets },
+                options: {
+                    responsive: true,
+                    layout: { padding: { top: 18, bottom: 10, left: 6, right: 6 } },
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { min: 0, max: 5.2, ticks: { stepSize: 1, callback: (v) => v <= 5 ? v : null } },
+                        x: {
+                            ticks: {
+                                color: (ctx) => {
+                                    const idx = typeof ctx.index === 'number' ? ctx.index : null;
+                                    const rawDate = (idx != null && data.rawDates) ? data.rawDates[idx] : null;
+                                    return getDateLabelColor(rawDate);
+                                }
+                            }
+                        }
+                    }
+                },
+                plugins: [menstrualBackgroundPlugin]
+            };
+
+            // Attach menstrual data to config for plugin access
+            config._menstrualData = { rawDates: data.rawDates, periods: cachedMenstrualPeriods };
+
+            lineChart = new Chart(ctx, config);
+        }
+
+        function severityColor(avg) {
+            if (avg == null) return '#666';
+            if (avg >= 4) return '#dc2626';
+            if (avg >= 3) return '#f59e0b';
+            return '#16a34a';
+        }
+
+        function renderSimpleSummaryHtml(patientEntries, partnerObservations, days) {
+            const top3 = getTopSymptomsByAvgSeverity(patientEntries, days, 3);
+            const menstrualEvents = (patientEntries || []).filter(e => e.event === true && ['period_started', 'period_ended', 'spotting'].includes(e.type));
+
+            const spottingCount = menstrualEvents.filter(e => e.type === 'spotting').length;
+            const lastPeriodStart = menstrualEvents.filter(e => e.type === 'period_started').sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+            const lastPeriodEnd = menstrualEvents.filter(e => e.type === 'period_ended').sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+
+            const daysLabel = days === 'all' ? 'All time' : `Last ${days} days`;
+
+            const topHtml = top3.length === 0
+                ? '<div class="muted">No symptom data for this period.</div>'
+                : `<div style="margin-top:0.5rem;">${top3.map((s, i) => {
+                    const label = s.type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                    const c = severityColor(s.avgSeverity);
+                    return `
+                        <div style="display:flex;justify-content:space-between;gap:0.75rem;padding:0.35rem 0;border-bottom:1px solid #eee;">
+                            <div><strong>#${i + 1}</strong> ${label} <span class="muted">(${s.count})</span></div>
+                            <div style="color:${c};font-weight:700;">${s.avgSeverity.toFixed(1)}/5</div>
+                        </div>
+                    `;
+                }).join('')}</div>`;
+
+            const menstrualHtml = (menstrualEvents.length === 0)
+                ? '<div class="muted">No menstrual/bleeding events logged in this period.</div>'
+                : `
+                    <div style="margin-top:0.35rem;">
+                        <div><span style="color:#e91e8c;font-weight:700;">Period</span>: ${lastPeriodStart ? lastPeriodStart.date.split('T')[0] : '-'} → ${lastPeriodEnd ? lastPeriodEnd.date.split('T')[0] : '-'}</div>
+                        <div><span style="color:#dc2626;font-weight:700;">Spotting</span>: ${spottingCount}</div>
+                    </div>
+                `;
+
+            return `
+                <div style="margin-bottom:0.35rem;"><strong>Quick summary</strong> <span class="muted">(${daysLabel})</span></div>
+                <div class="muted" style="margin-bottom:0.5rem;">Patient entries: ${(patientEntries || []).length} • Partner observations: ${(partnerObservations || []).length}</div>
+                <div style="margin-top:0.25rem;"><strong>Top symptoms</strong></div>
+                ${topHtml}
+                <div style="margin-top:0.75rem;"><strong>Menstrual / bleeding</strong></div>
+                ${menstrualHtml}
+            `;
+        }
+
+        function toggleTextSummary() {
+            const output = document.getElementById('summary-output');
+            if (output.style.display === 'none') {
+                const days = document.getElementById('date-range').value;
+                output.innerHTML = renderSimpleSummaryHtml(getEntries(), getPartnerObservations(), days);
+                output.style.display = 'block';
+            } else {
+                output.style.display = 'none';
+            }
+        }
+
+        // Render partner history (table)
+        function renderPartnerHistory() {
+            const observations = getPartnerObservations();
+            buildHistoryTable('partner-history-table', observations, getAllTypes('partner'), false);
+        }
+
+        // Initialize names
+        document.getElementById('patient-name').value = getName(PATIENT_NAME_KEY);
+        document.getElementById('partner-name').value = getName(PARTNER_NAME_KEY);
+
+        document.getElementById('patient-name').addEventListener('input', (e) => {
+            setName(PATIENT_NAME_KEY, e.target.value);
+            updateTabLabels();
+        });
+
+        document.getElementById('partner-name').addEventListener('input', (e) => {
+            setName(PARTNER_NAME_KEY, e.target.value);
+            updateTabLabels();
+        });
+
+        updateTabLabels();
+
+        // Initialize
+        renderHistory();
+        renderPartnerHistory();
+    </script>
+</body>
+</html>

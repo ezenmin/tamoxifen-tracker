@@ -1,0 +1,13 @@
+{
+  "name": "tamoxifen-tracker",
+  "version": "0.1.0",
+  "description": "Track Tamoxifen side effects and share summaries with your doctor",
+  "private": true,
+  "scripts": {
+    "dev": "npx http-server public -p 3000 -c-1",
+    "test": "node tests/run-tests.js"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}
