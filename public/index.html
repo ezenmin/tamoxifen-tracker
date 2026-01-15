@@ -1813,14 +1813,23 @@
                     currentUser = session.user;
 
                     // Try to claim any pending household invite (for partners)
-                    try {
-                        await claimHouseholdInvite();
-                    } catch (e) {
-                        // Ignore errors - user may not have a pending invite
-                        console.log('No pending invite to claim:', e.message);
+                    const claimResult = await claimHouseholdInvite();
+
+                    if (claimResult.error) {
+                        // Actual error - show message, don't create new household
+                        document.getElementById('auth-status').textContent = 'Error joining household: ' + claimResult.error;
+                        console.error('Claim invite error:', claimResult.error);
+                        // Still update UI to show logged-in state but with error
+                        updateAuthUI(session);
+                        return;
                     }
 
-                    await ensureHousehold();
+                    if (!claimResult.success) {
+                        // No invite to claim (noInvite: true) - proceed to ensureHousehold
+                        await ensureHousehold();
+                    }
+                    // If claimResult.success, household/role already set by claimHouseholdInvite
+
                     updateAuthUI(session);
 
                     // Set default tab based on role
@@ -1853,14 +1862,22 @@
                     updateAuthUI(session);
                     if (session) {
                         // Try to claim any pending household invite (for partners)
-                        try {
-                            await claimHouseholdInvite();
-                        } catch (e) {
-                            // Ignore errors - user may not have a pending invite
-                            console.log('No pending invite to claim:', e.message);
+                        const claimResult = await claimHouseholdInvite();
+
+                        if (claimResult.error) {
+                            // Actual error - show message, don't create new household
+                            document.getElementById('auth-status').textContent = 'Error joining household: ' + claimResult.error;
+                            console.error('Claim invite error:', claimResult.error);
+                            updateAuthUI(session);
+                            return;
                         }
 
-                        await ensureHousehold();
+                        if (!claimResult.success) {
+                            // No invite to claim - proceed to ensureHousehold
+                            await ensureHousehold();
+                        }
+                        // If claimResult.success, household/role already set
+
                         updateAuthUI(session); // Update UI again after role is determined
 
                         // Set default tab based on role

@@ -37,7 +37,15 @@ function getAppBaseUrl() {
 // Initialize Supabase client if available
 function initSupabase() {
     if (typeof window !== 'undefined' && window.supabase && window.supabase.createClient) {
-        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            auth: {
+                persistSession: true,
+                autoRefreshToken: true,
+                detectSessionInUrl: true,
+                storage: window.localStorage,
+                storageKey: 'tamoxifen-auth'
+            }
+        });
         return true;
     }
     return false;
@@ -121,20 +129,8 @@ function onAuthStateChange(callback) {
 async function ensureHousehold() {
     if (!supabaseClient || !currentUser) return null;
 
-    // First check if user owns a household
-    const { data: ownedHousehold } = await supabaseClient
-        .from('households')
-        .select('id')
-        .eq('owner_user_id', currentUser.id)
-        .single();
-
-    if (ownedHousehold) {
-        currentHouseholdId = ownedHousehold.id;
-        currentUserRole = 'patient';
-        return ownedHousehold.id;
-    }
-
-    // Check if user is a member of a household (partner)
+    // Prefer household membership first. This prevents partners who accidentally created
+    // their own empty household earlier from being routed to the wrong household.
     const { data: membership } = await supabaseClient
         .from('household_members')
         .select('household_id, role')
@@ -145,6 +141,19 @@ async function ensureHousehold() {
         currentHouseholdId = membership.household_id;
         currentUserRole = membership.role || 'partner';
         return membership.household_id;
+    }
+
+    // If not a member, check if user owns a household
+    const { data: ownedHousehold } = await supabaseClient
+        .from('households')
+        .select('id')
+        .eq('owner_user_id', currentUser.id)
+        .single();
+
+    if (ownedHousehold) {
+        currentHouseholdId = ownedHousehold.id;
+        currentUserRole = 'patient';
+        return ownedHousehold.id;
     }
 
     // No household yet - create one (user becomes patient/owner)
@@ -184,12 +193,16 @@ async function createPartnerInvite(partnerEmail) {
     return { success: true };
 }
 
+// Result object for claimHouseholdInvite
+// { success: true, household_id, role } - invite claimed
+// { success: false, noInvite: true } - no invite found (not an error)
+// { success: false, error: 'message' } - actual error occurred
 async function claimHouseholdInvite() {
-    if (!supabaseClient || !currentUser) return null;
+    if (!supabaseClient || !currentUser) return { success: false, noInvite: true };
 
     // Call the edge function to claim any pending invite
     const session = await getSession();
-    if (!session) return null;
+    if (!session) return { success: false, noInvite: true };
 
     try {
         const response = await fetch(`${SUPABASE_URL}/functions/v1/claim-household-invite`, {
@@ -200,22 +213,35 @@ async function claimHouseholdInvite() {
             }
         });
 
+        if (response.status === 404) {
+            // No invite found - this is expected for non-partners
+            return { success: false, noInvite: true };
+        }
+
         if (!response.ok) {
-            // No invite found or error - not a problem, just means no invite
-            return null;
+            // Actual error (401, 500, CORS, etc.)
+            let errorMsg = `Server error (${response.status})`;
+            try {
+                const errData = await response.json();
+                errorMsg = errData.error || errorMsg;
+            } catch (_) {}
+            console.error('Claim invite error:', errorMsg);
+            return { success: false, error: errorMsg };
         }
 
         const data = await response.json();
         if (data.success && data.household_id) {
             currentHouseholdId = data.household_id;
             currentUserRole = data.role || 'partner';
-            return data;
+            return { success: true, household_id: data.household_id, role: data.role || 'partner' };
         }
+
+        return { success: false, noInvite: true };
     } catch (e) {
-        // Ignore errors - just means no invite to claim
-        console.log('No invite to claim or error:', e.message);
+        // Network error, CORS, etc.
+        console.error('Claim invite fetch error:', e.message);
+        return { success: false, error: e.message || 'Network error' };
     }
-    return null;
 }
 
 function getUserRole() {
@@ -226,22 +252,24 @@ function getHouseholdId() {
     return currentHouseholdId;
 }
 
+function getCurrentUserId() {
+    return currentUser?.id || null;
+}
+
 // =============================================================================
 // SYNC FUNCTIONS
 // =============================================================================
 
 async function syncEntriesToSupabase(localEntries) {
-    if (!supabaseClient || !currentHouseholdId) return;
+    if (!supabaseClient || !currentHouseholdId || !currentUser) return;
 
     // Get remote entries
     const { data: remoteEntries, error } = await supabaseClient
         .from('entries')
-        .select('id, payload')
+        .select('id, payload, created_by_user_id')
         .eq('household_id', currentHouseholdId);
 
     if (error) throw error;
-
-    const remoteIds = new Set((remoteEntries || []).map(e => e.payload?.id));
 
     // Upsert local entries that don't exist remotely or need updating
     for (const entry of localEntries) {
@@ -251,19 +279,25 @@ async function syncEntriesToSupabase(localEntries) {
         const existingRemote = (remoteEntries || []).find(r => r.payload?.id === entry.id);
 
         if (existingRemote) {
-            // Update if changed
+            // Only update if this user owns the entry (created_by_user_id matches)
+            // If created_by_user_id is null (legacy), allow update by anyone in household
+            if (existingRemote.created_by_user_id && existingRemote.created_by_user_id !== currentUser.id) {
+                // Skip - can't update other user's entries
+                continue;
+            }
             await supabaseClient
                 .from('entries')
                 .update({ payload: entry, occurred_at: occurredAt })
                 .eq('id', existingRemote.id);
         } else {
-            // Insert new
+            // Insert new - set created_by_user_id to current user
             await supabaseClient
                 .from('entries')
                 .insert({
                     household_id: currentHouseholdId,
                     occurred_at: occurredAt,
-                    payload: entry
+                    payload: entry,
+                    created_by_user_id: currentUser.id
                 });
         }
     }
@@ -274,27 +308,43 @@ async function fetchEntriesFromSupabase() {
 
     const { data, error } = await supabaseClient
         .from('entries')
-        .select('payload')
+        .select('payload, created_by_user_id')
         .eq('household_id', currentHouseholdId)
         .order('occurred_at', { ascending: false });
 
     if (error) throw error;
-    return (data || []).map(row => row.payload);
+    // Include created_by_user_id in the payload so frontend can check ownership
+    return (data || []).map(row => ({
+        ...row.payload,
+        _created_by_user_id: row.created_by_user_id
+    }));
 }
 
 async function deleteEntryFromSupabase(entryId) {
-    if (!supabaseClient || !currentHouseholdId) return;
+    if (!supabaseClient || !currentHouseholdId || !currentUser) return;
 
     // Find the entry by payload.id
     const { data } = await supabaseClient
         .from('entries')
-        .select('id, payload')
+        .select('id, payload, created_by_user_id')
         .eq('household_id', currentHouseholdId);
 
     const toDelete = (data || []).find(r => r.payload?.id === entryId);
     if (toDelete) {
+        // Only delete if user owns the entry (or legacy entry with null created_by_user_id)
+        if (toDelete.created_by_user_id && toDelete.created_by_user_id !== currentUser.id) {
+            throw new Error('Cannot delete entries created by another user');
+        }
         await supabaseClient.from('entries').delete().eq('id', toDelete.id);
     }
+}
+
+// Check if current user can edit/delete an entry
+function canEditEntry(entry) {
+    if (!currentUser) return false;
+    // If no _created_by_user_id, it's a legacy entry - allow edit by anyone in household
+    if (!entry._created_by_user_id) return true;
+    return entry._created_by_user_id === currentUser.id;
 }
 
 // =============================================================================
@@ -862,8 +912,10 @@ if (typeof module !== 'undefined' && module.exports) {
         ensureHousehold: typeof ensureHousehold !== 'undefined' ? ensureHousehold : async () => null,
         getUserRole: typeof getUserRole !== 'undefined' ? getUserRole : () => null,
         getHouseholdId: typeof getHouseholdId !== 'undefined' ? getHouseholdId : () => null,
+        getCurrentUserId: typeof getCurrentUserId !== 'undefined' ? getCurrentUserId : () => null,
+        canEditEntry: typeof canEditEntry !== 'undefined' ? canEditEntry : () => true,
         createPartnerInvite: typeof createPartnerInvite !== 'undefined' ? createPartnerInvite : async () => {},
-        claimHouseholdInvite: typeof claimHouseholdInvite !== 'undefined' ? claimHouseholdInvite : async () => null,
+        claimHouseholdInvite: typeof claimHouseholdInvite !== 'undefined' ? claimHouseholdInvite : async () => ({ success: false, noInvite: true }),
         syncEntriesToSupabase: typeof syncEntriesToSupabase !== 'undefined' ? syncEntriesToSupabase : async () => {},
         fetchEntriesFromSupabase: typeof fetchEntriesFromSupabase !== 'undefined' ? fetchEntriesFromSupabase : async () => [],
         deleteEntryFromSupabase: typeof deleteEntryFromSupabase !== 'undefined' ? deleteEntryFromSupabase : async () => {},
