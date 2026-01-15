@@ -333,6 +333,51 @@ async function removePartnerFromHousehold(userId) {
     return { success: true };
 }
 
+/**
+ * Fetch pending invites for the current household
+ * @returns {Promise<Array>} Array of pending invite objects
+ */
+async function getPendingInvites() {
+    if (!supabaseClient || !currentHouseholdId) return [];
+    if (currentUserRole !== 'patient') return []; // Only patient can see invites
+
+    const now = new Date().toISOString();
+    const { data, error } = await supabaseClient
+        .from('household_invites')
+        .select('id, invited_email, expires_at, created_at')
+        .eq('household_id', currentHouseholdId)
+        .is('accepted_at', null)
+        .or('revoked.is.null,revoked.eq.false')
+        .gt('expires_at', now)
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching pending invites:', error);
+        return [];
+    }
+
+    return data || [];
+}
+
+/**
+ * Revoke a pending invite
+ * @param {string} inviteId - The invite ID to revoke
+ * @returns {Promise<boolean>} Success status
+ */
+async function revokeInvite(inviteId) {
+    if (!supabaseClient || !currentHouseholdId) throw new Error('Not authenticated');
+    if (currentUserRole !== 'patient') throw new Error('Only patient can revoke invites');
+
+    const { error } = await supabaseClient
+        .from('household_invites')
+        .update({ revoked: true })
+        .eq('id', inviteId)
+        .eq('household_id', currentHouseholdId); // Extra safety check
+
+    if (error) throw error;
+    return true;
+}
+
 // =============================================================================
 // SYNC FUNCTIONS
 // =============================================================================
@@ -1020,6 +1065,8 @@ if (typeof module !== 'undefined' && module.exports) {
         fetchDoctorSummary: typeof fetchDoctorSummary !== 'undefined' ? fetchDoctorSummary : async () => ({}),
         checkShareMode: typeof checkShareMode !== 'undefined' ? checkShareMode : () => null,
         getHouseholdMembers: typeof getHouseholdMembers !== 'undefined' ? getHouseholdMembers : async () => [],
-        removePartnerFromHousehold: typeof removePartnerFromHousehold !== 'undefined' ? removePartnerFromHousehold : async () => {}
+        removePartnerFromHousehold: typeof removePartnerFromHousehold !== 'undefined' ? removePartnerFromHousehold : async () => {},
+        getPendingInvites: typeof getPendingInvites !== 'undefined' ? getPendingInvites : async () => [],
+        revokeInvite: typeof revokeInvite !== 'undefined' ? revokeInvite : async () => false
     };
 }

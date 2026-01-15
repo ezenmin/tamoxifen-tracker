@@ -601,6 +601,28 @@
                     <button class="inline-btn" onclick="copyDoctorLink()" style="width:100%;">Copy Link</button>
                 </div>
             </div>
+
+            <!-- Partner Management (patient only) -->
+            <div id="partner-management-section" class="card" style="display:none;">
+                <h2>Partner Management</h2>
+                <p class="helper" style="margin-top:0;">View and manage partner access to your data.</p>
+
+                <!-- Pending Invites -->
+                <div style="margin-bottom:1rem;">
+                    <h3 style="font-size:1rem;margin-bottom:0.5rem;">Pending Invites</h3>
+                    <div id="pending-invites-list">
+                        <div class="empty-state" style="font-size:0.85rem;">No pending invites</div>
+                    </div>
+                </div>
+
+                <!-- Active Partners -->
+                <div>
+                    <h3 style="font-size:1rem;margin-bottom:0.5rem;">Current Partners</h3>
+                    <div id="active-partners-list">
+                        <div class="empty-state" style="font-size:0.85rem;">No partners have joined yet</div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Info Tab -->
@@ -2036,6 +2058,92 @@
             }
         }
 
+        async function renderPartnerManagement() {
+            const section = document.getElementById('partner-management-section');
+            const pendingList = document.getElementById('pending-invites-list');
+            const partnersList = document.getElementById('active-partners-list');
+
+            if (!section || !pendingList || !partnersList) return;
+
+            const role = getUserRole();
+            if (role !== 'patient') {
+                section.style.display = 'none';
+                return;
+            }
+
+            section.style.display = 'block';
+
+            try {
+                // Fetch pending invites
+                const pendingInvites = await getPendingInvites();
+                if (pendingInvites.length === 0) {
+                    pendingList.innerHTML = '<div class="empty-state" style="font-size:0.85rem;">No pending invites</div>';
+                } else {
+                    pendingList.innerHTML = pendingInvites.map(inv => {
+                        const expiresDate = new Date(inv.expires_at).toLocaleDateString();
+                        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem;background:#f9fafb;border-radius:4px;margin-bottom:0.5rem;">
+                            <div>
+                                <strong>${inv.invited_email}</strong>
+                                <span style="color:#666;font-size:0.8rem;margin-left:0.5rem;">expires ${expiresDate}</span>
+                            </div>
+                            <button class="inline-btn" onclick="handleRevokeInvite('${inv.id}')" style="background:#fee2e2;color:#dc2626;">Revoke</button>
+                        </div>`;
+                    }).join('');
+                }
+
+                // Fetch active partners
+                const members = await getHouseholdMembers();
+                const partners = members.filter(m => m.role === 'partner');
+                if (partners.length === 0) {
+                    partnersList.innerHTML = '<div class="empty-state" style="font-size:0.85rem;">No partners have joined yet</div>';
+                } else {
+                    partnersList.innerHTML = partners.map(p => {
+                        const joinedDate = p.created_at ? new Date(p.created_at).toLocaleDateString() : 'Unknown';
+                        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem;background:#f0fdf4;border-radius:4px;margin-bottom:0.5rem;">
+                            <div>
+                                <strong>${p.email}</strong>
+                                <span style="color:#666;font-size:0.8rem;margin-left:0.5rem;">joined ${joinedDate}</span>
+                            </div>
+                            <button class="inline-btn" onclick="handleRemovePartnerById('${p.user_id}')" style="background:#fee2e2;color:#dc2626;">Remove</button>
+                        </div>`;
+                    }).join('');
+                }
+            } catch (e) {
+                console.error('Error rendering partner management:', e);
+                pendingList.innerHTML = `<div class="empty-state" style="color:#dc2626;">Error loading invites</div>`;
+                partnersList.innerHTML = `<div class="empty-state" style="color:#dc2626;">Error loading partners</div>`;
+            }
+        }
+
+        async function handleRevokeInvite(inviteId) {
+            if (!confirm('Revoke this invite? The partner will no longer be able to join with this invitation.')) {
+                return;
+            }
+
+            try {
+                await revokeInvite(inviteId);
+                alert('Invite revoked successfully');
+                renderPartnerManagement(); // Refresh
+            } catch (e) {
+                alert('Error revoking invite: ' + e.message);
+            }
+        }
+
+        async function handleRemovePartnerById(userId) {
+            if (!confirm('Remove this partner? They will lose access to your data.')) {
+                return;
+            }
+
+            try {
+                await removePartnerFromHousehold(userId);
+                alert('Partner removed successfully');
+                renderPartnerManagement(); // Refresh
+                loadCurrentPartner(); // Also refresh the current partner display
+            } catch (e) {
+                alert('Error removing partner: ' + e.message);
+            }
+        }
+
         function renderShareSummary(summary) {
             const container = document.getElementById('share-summary-content');
             if (summary.error) {
@@ -2136,6 +2244,9 @@
                     } catch (e) {
                         console.error('Sync error:', e);
                     }
+
+                    // Render partner management section (patient only)
+                    renderPartnerManagement();
                 } else {
                     updateAuthUI(null);
                 }
@@ -2184,6 +2295,9 @@
                         } catch (e) {
                             console.error('Sync error:', e);
                         }
+
+                        // Render partner management section (patient only)
+                        renderPartnerManagement();
                     }
                 });
             }
