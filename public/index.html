@@ -417,6 +417,7 @@
             <button class="tab active" onclick="showTab('log')"><span id="tab-log-label">Log</span></button>
             <button class="tab" onclick="showTab('partner')"><span id="tab-partner-label">Partner</span></button>
             <button class="tab" onclick="showTab('summary')">Summary</button>
+            <button class="tab" id="tab-manage-btn" onclick="showTab('manage')" style="display:none;">Manage</button>
         </div>
 
         <!-- Log Tab -->
@@ -602,13 +603,16 @@
                 </div>
             </div>
 
-            <!-- Partner Management (patient only) -->
-            <div id="partner-management-section" class="card" style="display:none;">
+        </div>
+
+        <!-- Manage Tab (patient only) -->
+        <div id="tab-manage" class="tab-content" style="display:none;">
+            <div class="card">
                 <h2>Partner Management</h2>
                 <p class="helper" style="margin-top:0;">View and manage partner access to your data.</p>
 
                 <!-- Pending Invites -->
-                <div style="margin-bottom:1rem;">
+                <div style="margin-bottom:1.5rem;">
                     <h3 style="font-size:1rem;margin-bottom:0.5rem;">Pending Invites</h3>
                     <div id="pending-invites-list">
                         <div class="empty-state" style="font-size:0.85rem;">No pending invites</div>
@@ -988,6 +992,7 @@
             if (name === 'log') renderHistory();
             if (name === 'partner') renderPartnerHistory();
             if (name === 'summary') updateCharts();
+            if (name === 'manage') renderPartnerManagement();
         }
 
         function quickRatePatient(type, severity, evt) {
@@ -2059,19 +2064,20 @@
         }
 
         async function renderPartnerManagement() {
-            const section = document.getElementById('partner-management-section');
+            const manageTabBtn = document.getElementById('tab-manage-btn');
             const pendingList = document.getElementById('pending-invites-list');
             const partnersList = document.getElementById('active-partners-list');
 
-            if (!section || !pendingList || !partnersList) return;
-
             const role = getUserRole();
             if (role !== 'patient') {
-                section.style.display = 'none';
+                if (manageTabBtn) manageTabBtn.style.display = 'none';
                 return;
             }
 
-            section.style.display = 'block';
+            // Show manage tab for patients
+            if (manageTabBtn) manageTabBtn.style.display = 'inline-block';
+
+            if (!pendingList || !partnersList) return;
 
             try {
                 // Fetch pending invites
