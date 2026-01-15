@@ -389,20 +389,12 @@ async function syncNameToSupabase(role, displayName) {
     const trimmedName = (displayName || '').trim();
 
     try {
-        if (role === 'patient') {
-            // Patient name goes in households table
-            await supabaseClient
-                .from('households')
-                .update({ patient_name: trimmedName })
-                .eq('id', currentHouseholdId);
-        } else {
-            // Partner name goes in household_members
-            await supabaseClient
-                .from('household_members')
-                .update({ display_name: trimmedName })
-                .eq('household_id', currentHouseholdId)
-                .eq('user_id', currentUser.id);
-        }
+        // Both names stored in households table for household-wide sync
+        const updateField = role === 'patient' ? 'patient_name' : 'partner_name';
+        await supabaseClient
+            .from('households')
+            .update({ [updateField]: trimmedName })
+            .eq('id', currentHouseholdId);
         console.log(`Synced ${role} name to Supabase:`, trimmedName);
     } catch (err) {
         console.error('Failed to sync name:', err);
@@ -416,10 +408,10 @@ async function fetchNamesFromSupabase() {
     if (!supabaseClient || !currentHouseholdId) return;
 
     try {
-        // Fetch patient name from households
+        // Fetch both names from households table
         const { data: household } = await supabaseClient
             .from('households')
-            .select('patient_name')
+            .select('patient_name, partner_name')
             .eq('id', currentHouseholdId)
             .single();
 
@@ -427,15 +419,8 @@ async function fetchNamesFromSupabase() {
             localStorage.setItem('tamoxifen-patient-name', household.patient_name);
         }
 
-        // Fetch partner name from household_members
-        const { data: members } = await supabaseClient
-            .from('household_members')
-            .select('display_name, role')
-            .eq('household_id', currentHouseholdId)
-            .eq('role', 'partner');
-
-        if (members?.[0]?.display_name) {
-            localStorage.setItem('tamoxifen-partner-name', members[0].display_name);
+        if (household?.partner_name) {
+            localStorage.setItem('tamoxifen-partner-name', household.partner_name);
         }
 
         // Update UI if function exists
