@@ -64,6 +64,16 @@ function createEventEntry(type, notes) {
 }
 
 /**
+ * Create a daily note entry (event-style, no severity)
+ */
+function createDailyNote(author, notes, dateIso) {
+    const entry = createEventEntry('daily_note', notes);
+    entry.author = author === 'partner' ? 'partner' : 'patient';
+    if (dateIso) entry.date = dateIso;
+    return entry;
+}
+
+/**
  * Generate unique ID
  */
 function generateId() {
@@ -483,6 +493,7 @@ if (typeof module !== 'undefined' && module.exports) {
         MENSTRUAL_EVENT_TYPES,
         createEntry,
         createEventEntry,
+        createDailyNote,
         createPartnerObservation,
         formatSummary,
         filterByDateRange,

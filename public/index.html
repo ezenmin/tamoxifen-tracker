@@ -384,10 +384,18 @@
                 <button class="inline-btn" onclick="handleSignOut()" style="margin-left:auto;">Sign out</button>
             </div>
             <!-- Partner invite (patient only) -->
-            <div id="partner-invite-section" style="display:none;flex-wrap:wrap;gap:0.5rem;align-items:center;padding-top:0.5rem;border-top:1px solid #eee;">
-                <input type="email" id="partner-email" placeholder="Partner's email" class="inline-input" style="flex:1;min-width:180px;" />
-                <button class="inline-btn" onclick="handleInvitePartner()">Invite partner (7 days)</button>
+            <div id="partner-invite-section" style="display:none;padding-top:0.5rem;border-top:1px solid #eee;">
+                <div style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;">
+                    <input type="email" id="partner-email" placeholder="Partner's email" class="inline-input" style="flex:1;min-width:180px;" />
+                    <button class="inline-btn" onclick="handleInvitePartner()">Send invite</button>
+                </div>
+                <div class="helper" style="margin-top:0.25rem;font-size:0.75rem;">Invite expires in 7 days (only affects joining; once joined, partner stays connected until removed).</div>
                 <span id="invite-status" style="font-size:0.85rem;color:#666;"></span>
+                <!-- Current partner display + remove -->
+                <div id="current-partner-section" style="display:none;margin-top:0.5rem;padding-top:0.5rem;border-top:1px dashed #ddd;">
+                    <span style="font-size:0.85rem;">Current partner: <strong id="current-partner-email"></strong></span>
+                    <button class="inline-btn" onclick="handleRemovePartner()" style="margin-left:0.5rem;background:#fee2e2;color:#dc2626;">Remove</button>
+                </div>
             </div>
         </div>
     </div>
@@ -439,6 +447,15 @@
                             <button class="menstrual-btn spotting" onclick="logMenstrualEvent('spotting')">Spotting / unexpected</button>
                         </div>
                     </div>
+
+                    <div class="daily-note-section" style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid #eee;">
+                        <label>Day note (patient)</label>
+                        <div style="display:flex;gap:0.5rem;">
+                            <input id="patient-day-note" class="inline-input" style="flex:1;" placeholder="How are you feeling today?" />
+                            <button class="inline-btn" onclick="saveDayNote('patient')">Save</button>
+                        </div>
+                        <div class="helper" style="margin-top:0.25rem;">A free-text note for the selected date.</div>
+                    </div>
                 </div>
 
                 <div class="card history-col">
@@ -470,6 +487,15 @@
                     <label>Add a custom observation</label>
                     <input id="custom-partner-input" class="inline-input" style="width:100%;margin-bottom:0.5rem;" placeholder="e.g., Seemed dizzy" />
                     <button class="inline-btn" style="width:100%;" onclick="addCustomType('partner')">Add</button>
+
+                    <div class="daily-note-section" style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid #eee;">
+                        <label>Day note (partner)</label>
+                        <div style="display:flex;gap:0.5rem;">
+                            <input id="partner-day-note" class="inline-input" style="flex:1;" placeholder="Any observations or thoughts?" />
+                            <button class="inline-btn" onclick="saveDayNote('partner')">Save</button>
+                        </div>
+                        <div class="helper" style="margin-top:0.25rem;">A free-text note for the selected date.</div>
+                    </div>
                 </div>
 
                 <div class="card history-col">
@@ -545,6 +571,24 @@
                 <p class="helper" style="margin-top:0;">Short, readable highlights (color-coded)</p>
                 <div id="summary-output" style="display:none;"></div>
                 <button class="primary" onclick="toggleTextSummary()">Show Text Summary</button>
+            </div>
+
+            <div class="card">
+                <h2>Daily Notes</h2>
+                <p class="helper" style="margin-top:0;">Side-by-side view of patient and partner notes for selected time period.</p>
+                <button class="primary" onclick="showNotesListing()">Show Notes</button>
+                <div id="notes-listing-output" style="display:none;margin-top:1rem;overflow-x:auto;">
+                    <table class="history-table" id="notes-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Patient Note</th>
+                                <th>Partner Note</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
             </div>
 
             <!-- Doctor Share Link (only shown when logged in) -->
@@ -1735,8 +1779,52 @@
                 await createPartnerInvite(email);
                 status.textContent = 'Invite sent! Partner can now sign in with that email.';
                 document.getElementById('partner-email').value = '';
+                loadCurrentPartner(); // Refresh partner display
             } catch (e) {
                 status.textContent = 'Error: ' + e.message;
+            }
+        }
+
+        async function loadCurrentPartner() {
+            const section = document.getElementById('current-partner-section');
+            const emailSpan = document.getElementById('current-partner-email');
+            if (!section || !emailSpan) return;
+
+            try {
+                const members = await getHouseholdMembers();
+                const partner = members.find(m => m.role === 'partner');
+                if (partner && partner.email) {
+                    emailSpan.textContent = partner.email;
+                    emailSpan.dataset.userId = partner.user_id;
+                    section.style.display = 'block';
+                } else {
+                    section.style.display = 'none';
+                }
+            } catch (e) {
+                section.style.display = 'none';
+            }
+        }
+
+        async function handleRemovePartner() {
+            const emailSpan = document.getElementById('current-partner-email');
+            const userId = emailSpan?.dataset?.userId;
+            const email = emailSpan?.textContent;
+
+            if (!userId) {
+                alert('No partner to remove');
+                return;
+            }
+
+            if (!confirm(`Remove ${email} as your partner? They will lose access to your data.`)) {
+                return;
+            }
+
+            try {
+                await removePartnerFromHousehold(userId);
+                alert('Partner removed successfully');
+                loadCurrentPartner(); // Refresh
+            } catch (e) {
+                alert('Error removing partner: ' + e.message);
             }
         }
 
@@ -1762,6 +1850,7 @@
                     roleBadge.style.color = '#166534';
                     if (partnerInviteSection) partnerInviteSection.style.display = 'flex';
                     if (doctorShareSection) doctorShareSection.style.display = 'block';
+                    loadCurrentPartner(); // Load and display current partner
                 } else if (role === 'partner') {
                     roleBadge.textContent = 'Partner';
                     roleBadge.style.background = '#e0e7ff';
@@ -1814,6 +1903,137 @@
             urlInput.select();
             document.execCommand('copy');
             alert('Link copied to clipboard!');
+        }
+
+        async function saveDayNote(author) {
+            const inputId = author === 'patient' ? 'patient-day-note' : 'partner-day-note';
+            const input = document.getElementById(inputId);
+            const noteText = input?.value?.trim();
+
+            if (!noteText) {
+                alert('Please enter a note first');
+                return;
+            }
+
+            const role = getUserRole();
+            // Validate role matches author
+            if (role !== author) {
+                alert(`Only ${author} can save ${author} notes`);
+                return;
+            }
+
+            try {
+                const kind = author === 'partner' ? 'partner' : 'patient';
+                const selectedDate = getSelectedLogDate(kind);
+                const todayStart = startOfDay(selectedDate);
+                const todayEnd = endOfDay(selectedDate);
+
+                // Daily note is an event-style entry (no severity)
+                const entry = createDailyNote(author, noteText, selectedDate.toISOString());
+
+                if (author === 'patient') {
+                    const entries = getEntries();
+                    const existingIdx = entries.findIndex(e =>
+                        (e.type === 'daily_note' || e.isNote) &&
+                        (e.author || 'patient') === 'patient' &&
+                        new Date(e.date) >= todayStart &&
+                        new Date(e.date) <= todayEnd
+                    );
+                    if (existingIdx >= 0) {
+                        entries[existingIdx].notes = noteText;
+                        entries[existingIdx].date = selectedDate.toISOString();
+                    } else {
+                        entries.unshift(entry);
+                    }
+                    entries.sort((a, b) => new Date(b.date) - new Date(a.date));
+                    saveEntries(entries);
+                } else {
+                    const observations = getPartnerObservations();
+                    const existingIdx = observations.findIndex(e =>
+                        (e.type === 'daily_note' || e.isNote) &&
+                        (e.author || 'partner') === 'partner' &&
+                        new Date(e.date) >= todayStart &&
+                        new Date(e.date) <= todayEnd
+                    );
+                    if (existingIdx >= 0) {
+                        observations[existingIdx].notes = noteText;
+                        observations[existingIdx].date = selectedDate.toISOString();
+                    } else {
+                        observations.unshift(entry);
+                    }
+                    observations.sort((a, b) => new Date(b.date) - new Date(a.date));
+                    savePartnerObservations(observations);
+                }
+
+                // Try to sync (non-blocking)
+                await syncEntriesToSupabase([entry]);
+                input.value = '';
+                alert('Note saved!');
+
+                renderHistory();
+                renderPartnerHistory();
+                updateCharts();
+            } catch (e) {
+                alert('Error saving note: ' + e.message);
+            }
+        }
+
+        async function showNotesListing() {
+            const output = document.getElementById('notes-listing-output');
+            const tbody = document.querySelector('#notes-table tbody');
+            if (!output || !tbody) return;
+
+            try {
+                const days = document.getElementById('date-range').value;
+                const now = new Date();
+                let startDate = null;
+                if (days !== 'all') {
+                    startDate = new Date(now);
+                    startDate.setDate(startDate.getDate() - parseInt(days));
+                }
+
+                const patientNotes = (getEntries() || [])
+                    .filter(e => (e.type === 'daily_note' || e.isNote))
+                    .map(e => ({ ...e, author: e.author || 'patient' }));
+
+                const partnerNotes = (getPartnerObservations() || [])
+                    .filter(e => (e.type === 'daily_note' || e.isNote))
+                    .map(e => ({ ...e, author: e.author || 'partner' }));
+
+                let notes = [...patientNotes, ...partnerNotes];
+                if (startDate) {
+                    notes = notes.filter(n => new Date(n.date) >= startDate);
+                }
+
+                if (notes.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#666;">No notes found for this period</td></tr>';
+                    output.style.display = 'block';
+                    return;
+                }
+
+                // Group notes by date
+                const byDate = {};
+                notes.forEach(n => {
+                    const date = n.date?.split('T')[0] || 'Unknown';
+                    if (!byDate[date]) byDate[date] = { patient: [], partner: [] };
+                    const author = (n.author === 'partner') ? 'partner' : 'patient';
+                    byDate[date][author].push(n.notes || '');
+                });
+
+                // Sort dates descending
+                const sortedDates = Object.keys(byDate).sort().reverse();
+
+                tbody.innerHTML = sortedDates.map(date => {
+                    const pNotes = byDate[date].patient.join('; ') || '-';
+                    const partnerNotes = byDate[date].partner.join('; ') || '-';
+                    return `<tr><td>${date}</td><td>${pNotes}</td><td>${partnerNotes}</td></tr>`;
+                }).join('');
+
+                output.style.display = 'block';
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="3" style="color:#dc2626;">Error: ${e.message}</td></tr>`;
+                output.style.display = 'block';
+            }
         }
 
         function renderShareSummary(summary) {

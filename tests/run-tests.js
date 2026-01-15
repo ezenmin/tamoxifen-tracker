@@ -136,6 +136,21 @@ if (fs.existsSync(trackerPath)) {
         assert(!threw, 'Should not throw when creating event entries');
     });
 
+    console.log('\n--- Daily Notes Tests ---');
+
+    test('createDailyNote returns event entry without severity', () => {
+        assert(typeof tracker.createDailyNote === 'function', 'Should export createDailyNote');
+        const date = '2026-01-15T00:00:00.000Z';
+        const note = tracker.createDailyNote('patient', 'work was stressful', date);
+        assert(note.id, 'Should have id');
+        assertEqual(note.type, 'daily_note', 'Should have type daily_note');
+        assertEqual(note.event, true, 'Should be event-style');
+        assertEqual(note.author, 'patient', 'Should set author');
+        assertEqual(note.notes, 'work was stressful', 'Should set notes');
+        assertEqual(note.date, date, 'Should preserve date');
+        assert(note.severity === undefined, 'Should NOT have severity');
+    });
+
     test('MENSTRUAL_EVENT_TYPES is exported and has expected types', () => {
         assert(tracker.MENSTRUAL_EVENT_TYPES, 'Should export MENSTRUAL_EVENT_TYPES');
         assert(tracker.MENSTRUAL_EVENT_TYPES.includes('period_started'), 'Should include period_started');

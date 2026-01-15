@@ -212,6 +212,8 @@ async function claimHouseholdInvite() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                // Supabase Edge Functions typically require apikey header in addition to Authorization.
+                'apikey': SUPABASE_ANON_KEY,
                 'Authorization': `Bearer ${session.access_token}`
             }
         });
@@ -220,7 +222,17 @@ async function claimHouseholdInvite() {
             // 404 = No invite found (expected for non-partners)
             // 401 = Auth issue with edge function (treat as no invite, don't block app)
             if (response.status === 401) {
-                console.log('Claim invite: 401 from edge function (treating as no invite)');
+                let details = '';
+                try {
+                    const errData = await response.json();
+                    if (errData && errData.error) details = ` (${errData.error})`;
+                } catch (_) {
+                    try {
+                        const text = await response.text();
+                        if (text) details = ` (${text.slice(0, 160)})`;
+                    } catch (_) {}
+                }
+                console.log(`Claim invite: 401 from edge function${details} (treating as no invite)`);
             }
             return { success: false, noInvite: true };
         }
@@ -262,6 +274,63 @@ function getHouseholdId() {
 
 function getCurrentUserId() {
     return currentUser?.id || null;
+}
+
+// =============================================================================
+// HOUSEHOLD MEMBER MANAGEMENT
+// =============================================================================
+
+async function getHouseholdMembers() {
+    if (!supabaseClient || !currentHouseholdId) return [];
+    if (currentUserRole !== 'patient') return []; // Only patient can see members
+
+    const { data, error } = await supabaseClient
+        .from('household_members')
+        .select('user_id, role, created_at')
+        .eq('household_id', currentHouseholdId);
+
+    if (error) {
+        console.error('Error fetching household members:', error);
+        return [];
+    }
+
+    // Get user emails from auth.users via a simple lookup
+    // Note: We can't directly query auth.users, but we can get email from invites
+    const members = data || [];
+
+    // Try to get emails from accepted invites
+    const { data: invites } = await supabaseClient
+        .from('household_invites')
+        .select('invited_email, accepted_by_user_id')
+        .eq('household_id', currentHouseholdId)
+        .not('accepted_by_user_id', 'is', null);
+
+    // Map user_id to email
+    const emailMap = {};
+    (invites || []).forEach(inv => {
+        if (inv.accepted_by_user_id) {
+            emailMap[inv.accepted_by_user_id] = inv.invited_email;
+        }
+    });
+
+    return members.map(m => ({
+        ...m,
+        email: emailMap[m.user_id] || 'Unknown'
+    }));
+}
+
+async function removePartnerFromHousehold(userId) {
+    if (!supabaseClient || !currentHouseholdId) throw new Error('Not authenticated');
+    if (currentUserRole !== 'patient') throw new Error('Only patient can remove partners');
+
+    const { error } = await supabaseClient
+        .from('household_members')
+        .delete()
+        .eq('household_id', currentHouseholdId)
+        .eq('user_id', userId);
+
+    if (error) throw error;
+    return { success: true };
 }
 
 // =============================================================================
@@ -489,6 +558,16 @@ function createEventEntry(type, notes) {
         notes: notes || '',
         date: new Date().toISOString()
     };
+}
+
+/**
+ * Create a daily note entry (event-style, no severity)
+ */
+function createDailyNote(author, notes, dateIso) {
+    const entry = createEventEntry('daily_note', notes);
+    entry.author = author === 'partner' ? 'partner' : 'patient';
+    if (dateIso) entry.date = dateIso;
+    return entry;
 }
 
 /**
@@ -911,6 +990,7 @@ if (typeof module !== 'undefined' && module.exports) {
         MENSTRUAL_EVENT_TYPES,
         createEntry,
         createEventEntry,
+        createDailyNote,
         createPartnerObservation,
         formatSummary,
         filterByDateRange,
@@ -938,6 +1018,8 @@ if (typeof module !== 'undefined' && module.exports) {
         deleteEntryFromSupabase: typeof deleteEntryFromSupabase !== 'undefined' ? deleteEntryFromSupabase : async () => {},
         createDoctorShareLink: typeof createDoctorShareLink !== 'undefined' ? createDoctorShareLink : async () => '',
         fetchDoctorSummary: typeof fetchDoctorSummary !== 'undefined' ? fetchDoctorSummary : async () => ({}),
-        checkShareMode: typeof checkShareMode !== 'undefined' ? checkShareMode : () => null
+        checkShareMode: typeof checkShareMode !== 'undefined' ? checkShareMode : () => null,
+        getHouseholdMembers: typeof getHouseholdMembers !== 'undefined' ? getHouseholdMembers : async () => [],
+        removePartnerFromHousehold: typeof removePartnerFromHousehold !== 'undefined' ? removePartnerFromHousehold : async () => {}
     };
 }

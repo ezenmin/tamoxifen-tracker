@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tamoxifen-tracker-v2';
+const CACHE_NAME = 'tamoxifen-tracker-v4';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -8,6 +8,9 @@ const ASSETS_TO_CACHE = [
   './icon-192.png',
   './icon-512.png'
 ];
+
+// Files that should always try network first (auth-critical)
+const NETWORK_FIRST_FILES = ['index.html', 'tracker.js'];
 
 // Install: cache app shell
 self.addEventListener('install', (event) => {
@@ -31,14 +34,17 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch: cache-first for assets, but network-first for navigations (HTML)
+// Fetch: network-first for navigations and critical JS, cache-first for other assets
 self.addEventListener('fetch', (event) => {
-  // For page navigations, prefer network so updates (like auth UI) show up.
-  if (event.request.mode === 'navigate') {
+  const url = new URL(event.request.url);
+  const isNetworkFirst = event.request.mode === 'navigate' ||
+    NETWORK_FIRST_FILES.some(f => url.pathname.endsWith(f));
+
+  if (isNetworkFirst) {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
-          // Cache the latest HTML for offline fallback
+          // Cache the latest for offline fallback
           const responseToCache = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(event.request, responseToCache);
