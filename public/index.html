@@ -2036,7 +2036,7 @@
                 const todayEnd = endOfDay(selectedDate);
 
                 // Daily note is an event-style entry (no severity)
-                const entry = createDailyNote(author, noteText, selectedDate.toISOString());
+                let entryToSync;
 
                 if (author === 'patient') {
                     const entries = getEntries();
@@ -2047,10 +2047,15 @@
                         new Date(e.date) <= todayEnd
                     );
                     if (existingIdx >= 0) {
+                        // Update existing note
                         entries[existingIdx].notes = noteText;
                         entries[existingIdx].date = selectedDate.toISOString();
+                        entryToSync = entries[existingIdx];
                     } else {
+                        // Create new note
+                        const entry = createDailyNote(author, noteText, selectedDate.toISOString());
                         entries.unshift(entry);
+                        entryToSync = entry;
                     }
                     entries.sort((a, b) => new Date(b.date) - new Date(a.date));
                     saveEntries(entries);
@@ -2063,17 +2068,24 @@
                         new Date(e.date) <= todayEnd
                     );
                     if (existingIdx >= 0) {
+                        // Update existing note
                         observations[existingIdx].notes = noteText;
                         observations[existingIdx].date = selectedDate.toISOString();
+                        entryToSync = observations[existingIdx];
                     } else {
+                        // Create new note
+                        const entry = createDailyNote(author, noteText, selectedDate.toISOString());
                         observations.unshift(entry);
+                        entryToSync = entry;
                     }
                     observations.sort((a, b) => new Date(b.date) - new Date(a.date));
                     savePartnerObservations(observations);
                 }
 
-                // Try to sync (non-blocking)
-                await syncEntriesToSupabase([entry]);
+                // Sync using upsert logic (replaces existing for same day/type/author)
+                if (typeof saveOrDeleteEntryToSupabase === 'function') {
+                    saveOrDeleteEntryToSupabase(entryToSync).catch(e => console.error('Sync error:', e));
+                }
                 input.value = '';
                 alert('Note saved!');
 
