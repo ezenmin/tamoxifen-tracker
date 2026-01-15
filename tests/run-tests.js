@@ -272,6 +272,53 @@ if (fs.existsSync(trackerPath)) {
         assert(Array.isArray(data.labels), 'labels should be an array');
         assertEqual(data.rawDates[0], '2025-01-15', 'rawDates should have date string');
     });
+
+    // -------------------------------------------------------------------------
+    // Partner Management Visibility Tests
+    // -------------------------------------------------------------------------
+    console.log('\n--- Partner Management Visibility Tests ---');
+
+    test('filterPendingInvites returns only unexpired, unaccepted, non-revoked invites', () => {
+        assert(typeof tracker.filterPendingInvites === 'function', 'Should export filterPendingInvites');
+        const now = Date.now();
+        const mockInvites = [
+            { id: '1', invited_email: 'pending@example.com', expires_at: new Date(now + 86400000).toISOString(), accepted_at: null, revoked: false },
+            { id: '2', invited_email: 'accepted@example.com', expires_at: new Date(now + 86400000).toISOString(), accepted_at: '2026-01-10T00:00:00Z', revoked: false },
+            { id: '3', invited_email: 'expired@example.com', expires_at: new Date(now - 86400000).toISOString(), accepted_at: null, revoked: false },
+            { id: '4', invited_email: 'revoked@example.com', expires_at: new Date(now + 86400000).toISOString(), accepted_at: null, revoked: true },
+        ];
+        const pending = tracker.filterPendingInvites(mockInvites);
+        assertEqual(pending.length, 1, 'Should have 1 pending invite');
+        assertEqual(pending[0].invited_email, 'pending@example.com', 'Wrong pending invite returned');
+    });
+
+    test('filterPendingInvites returns empty array when no invites', () => {
+        const pending = tracker.filterPendingInvites([]);
+        assertEqual(pending.length, 0, 'Should return empty array');
+    });
+
+    test('filterPendingInvites handles null/undefined input gracefully', () => {
+        assertEqual(tracker.filterPendingInvites(null).length, 0, 'null should return empty');
+        assertEqual(tracker.filterPendingInvites(undefined).length, 0, 'undefined should return empty');
+    });
+
+    test('filterActiveMembers returns only non-removed members', () => {
+        assert(typeof tracker.filterActiveMembers === 'function', 'Should export filterActiveMembers');
+        const mockMembers = [
+            { user_id: 'u1', role: 'partner', removed_at: null, profiles: { email: 'partner1@example.com' } },
+            { user_id: 'u2', role: 'partner', removed_at: '2026-01-01T00:00:00Z', profiles: { email: 'removed@example.com' } },
+            { user_id: 'u3', role: 'partner', removed_at: null, profiles: { email: 'partner2@example.com' } },
+        ];
+        const active = tracker.filterActiveMembers(mockMembers);
+        assertEqual(active.length, 2, 'Should have 2 active members');
+        assert(active.every(m => m.removed_at === null), 'All should have removed_at null');
+    });
+
+    test('filterActiveMembers handles empty/null input', () => {
+        assertEqual(tracker.filterActiveMembers([]).length, 0, 'Empty array should return empty');
+        assertEqual(tracker.filterActiveMembers(null).length, 0, 'null should return empty');
+    });
+
 } else {
     console.log('  (tracker.js not yet created - creating skeleton tests)');
     

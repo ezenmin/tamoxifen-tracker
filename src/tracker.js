@@ -485,6 +485,31 @@ function getSymptomTrendData(entries, days, types) {
     };
 }
 
+/**
+ * Filter invites to only return pending (unexpired, unaccepted, non-revoked)
+ * @param {Array} invites - Array of invite objects from household_invites
+ * @returns {Array} - Only pending invites
+ */
+function filterPendingInvites(invites) {
+    if (!invites || !Array.isArray(invites)) return [];
+    const now = new Date();
+    return invites.filter(i =>
+        !i.accepted_at &&
+        !i.revoked &&
+        new Date(i.expires_at) > now
+    );
+}
+
+/**
+ * Filter members to only return active (non-removed) members
+ * @param {Array} members - Array of member objects from household_members
+ * @returns {Array} - Only active members
+ */
+function filterActiveMembers(members) {
+    if (!members || !Array.isArray(members)) return [];
+    return members.filter(m => !m.removed_at);
+}
+
 // Export for Node.js (tests) and browser
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
@@ -501,6 +526,8 @@ if (typeof module !== 'undefined' && module.exports) {
         filterByAuthor,
         getChartData,
         getTopSymptomsByAvgSeverity,
-        getSymptomTrendData
+        getSymptomTrendData,
+        filterPendingInvites,
+        filterActiveMembers
     };
 }

@@ -11,7 +11,8 @@ function getCorsHeaders(origin: string | null): Record<string, string> {
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    // Supabase Edge Functions are commonly called with both Authorization and apikey headers.
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey",
   };
 }
 
@@ -20,7 +21,15 @@ Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(origin);
 
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
+    // Echo requested headers to satisfy browser preflight checks.
+    const requestedHeaders = req.headers.get("access-control-request-headers");
+    return new Response(null, {
+      status: 204,
+      headers: {
+        ...corsHeaders,
+        "Access-Control-Allow-Headers": requestedHeaders || corsHeaders["Access-Control-Allow-Headers"],
+      },
+    });
   }
 
   if (req.method !== "POST") {
