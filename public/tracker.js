@@ -129,21 +129,8 @@ function onAuthStateChange(callback) {
 async function ensureHousehold() {
     if (!supabaseClient || !currentUser) return null;
 
-    // Prefer household membership first. This prevents partners who accidentally created
-    // their own empty household earlier from being routed to the wrong household.
-    const { data: membership } = await supabaseClient
-        .from('household_members')
-        .select('household_id, role')
-        .eq('user_id', currentUser.id)
-        .single();
-
-    if (membership) {
-        currentHouseholdId = membership.household_id;
-        currentUserRole = membership.role || 'partner';
-        return membership.household_id;
-    }
-
-    // If not a member, check if user owns a household
+    // First check if user OWNS a household (they are the patient)
+    // This takes priority over membership to ensure patients always see their own data
     const { data: ownedHousehold } = await supabaseClient
         .from('households')
         .select('id')
@@ -153,10 +140,26 @@ async function ensureHousehold() {
     if (ownedHousehold) {
         currentHouseholdId = ownedHousehold.id;
         currentUserRole = 'patient';
+        console.log('ensureHousehold: Found owned household', ownedHousehold.id);
         return ownedHousehold.id;
     }
 
+    // If not an owner, check if user is a member (partner)
+    const { data: membership } = await supabaseClient
+        .from('household_members')
+        .select('household_id, role')
+        .eq('user_id', currentUser.id)
+        .single();
+
+    if (membership) {
+        currentHouseholdId = membership.household_id;
+        currentUserRole = membership.role || 'partner';
+        console.log('ensureHousehold: Found membership', membership.household_id, membership.role);
+        return membership.household_id;
+    }
+
     // No household yet - create one (user becomes patient/owner)
+    console.log('ensureHousehold: Creating new household for user', currentUser.id);
     const { data: created, error: insertError } = await supabaseClient
         .from('households')
         .insert({ owner_user_id: currentUser.id })
@@ -304,15 +307,24 @@ async function syncEntriesToSupabase(localEntries) {
 }
 
 async function fetchEntriesFromSupabase() {
-    if (!supabaseClient || !currentHouseholdId) return [];
+    if (!supabaseClient || !currentHouseholdId) {
+        console.log('fetchEntriesFromSupabase: No client or household', { hasClient: !!supabaseClient, householdId: currentHouseholdId });
+        return [];
+    }
 
+    console.log('fetchEntriesFromSupabase: Fetching for household', currentHouseholdId);
     const { data, error } = await supabaseClient
         .from('entries')
         .select('payload, created_by_user_id')
         .eq('household_id', currentHouseholdId)
         .order('occurred_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+        console.error('fetchEntriesFromSupabase: Error', error);
+        throw error;
+    }
+
+    console.log('fetchEntriesFromSupabase: Found', (data || []).length, 'entries');
     // Include created_by_user_id in the payload so frontend can check ownership
     return (data || []).map(row => ({
         ...row.payload,

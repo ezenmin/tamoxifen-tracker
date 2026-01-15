@@ -928,6 +928,13 @@
             const dot = evt && evt.target;
             if (dot && dot.classList.contains('logging')) return; // Prevent double-click
 
+            // Only patient can log in patient tab
+            const role = getUserRole();
+            if (role && role !== 'patient') {
+                alert('Only the patient can log entries here. Partners use the Partner tab.');
+                return;
+            }
+
             try {
                 if (dot) dot.classList.add('logging');
 
@@ -977,6 +984,13 @@
             const dot = evt && evt.target;
             if (dot && dot.classList.contains('logging')) return; // Prevent double-click
 
+            // Only partner can log in partner tab
+            const role = getUserRole();
+            if (role && role !== 'partner') {
+                alert('Only the partner can log observations here. Patients use the Log tab.');
+                return;
+            }
+
             try {
                 if (dot) dot.classList.add('logging');
 
@@ -1021,6 +1035,13 @@
         }
 
         function logMenstrualEvent(type) {
+            // Only patient can log menstrual events
+            const role = getUserRole();
+            if (role && role !== 'patient') {
+                alert('Only the patient can log menstrual events.');
+                return;
+            }
+
             try {
                 const entry = createEventEntry(type, '');
                 entry.author = 'patient';
@@ -1039,6 +1060,13 @@
         }
 
         function logWeightChange() {
+            // Only patient can log weight
+            const role = getUserRole();
+            if (role && role !== 'patient') {
+                alert('Only the patient can log weight changes.');
+                return;
+            }
+
             const valueRaw = (document.getElementById('weight-value').value || '').trim();
             if (!valueRaw) {
                 alert('Enter a number to log a weight change.');
