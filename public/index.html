@@ -2294,10 +2294,16 @@
                     // Sync entries from Supabase - remote is source of truth
                     try {
                         const remoteEntries = await fetchEntriesFromSupabase();
-                        // Remote takes full precedence - replace local with remote
+                        // Split by author and save to appropriate localStorage
                         if (remoteEntries.length > 0) {
-                            remoteEntries.sort((a, b) => new Date(b.date) - new Date(a.date));
-                            saveEntries(remoteEntries);
+                            const patientEntries = remoteEntries.filter(e => (e.author || 'patient') === 'patient');
+                            const partnerEntries = remoteEntries.filter(e => e.author === 'partner');
+                            
+                            patientEntries.sort((a, b) => new Date(b.date) - new Date(a.date));
+                            partnerEntries.sort((a, b) => new Date(b.date) - new Date(a.date));
+                            
+                            saveEntries(patientEntries);
+                            savePartnerObservations(partnerEntries);
                         }
                         renderHistory();
                         renderPartnerHistory();
@@ -2342,10 +2348,16 @@
                         // Fetch remote entries - remote is source of truth
                         try {
                             const remoteEntries = await fetchEntriesFromSupabase();
-                            // Remote takes full precedence - replace local with remote
+                            // Split by author and save to appropriate localStorage
                             if (remoteEntries.length > 0) {
-                                remoteEntries.sort((a, b) => new Date(b.date) - new Date(a.date));
-                                originalSaveEntries(remoteEntries);
+                                const patientEntries = remoteEntries.filter(e => (e.author || 'patient') === 'patient');
+                                const partnerEntries = remoteEntries.filter(e => e.author === 'partner');
+                                
+                                patientEntries.sort((a, b) => new Date(b.date) - new Date(a.date));
+                                partnerEntries.sort((a, b) => new Date(b.date) - new Date(a.date));
+                                
+                                originalSaveEntries(patientEntries);
+                                savePartnerObservations(partnerEntries);
                             }
                             renderHistory();
                             renderPartnerHistory();
