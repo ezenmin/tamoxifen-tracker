@@ -159,33 +159,6 @@
         <h1>Tamoxifen Tracker</h1>
     </header>
 
-    <!-- Sync/Auth Section -->
-    <div id="sync-section" class="card" style="margin:1rem auto;max-width:900px;display:none;">
-        <div id="auth-logged-out" style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;">
-            <input type="email" id="auth-email" placeholder="Email for sync" class="inline-input" style="flex:1;min-width:180px;" />
-            <button class="inline-btn" id="send-code-btn" onclick="handleSendCode()">Send code</button>
-            <input type="text" id="auth-code" inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code" class="inline-input" style="width:110px;" maxlength="6" />
-            <button class="inline-btn" onclick="handleVerifyCode()">Verify</button>
-            <span id="auth-status" style="font-size:0.85rem;color:#666;"></span>
-        </div>
-        <div id="auth-logged-in" style="display:none;flex-wrap:wrap;gap:0.5rem;align-items:center;">
-            <span id="auth-user-email" style="font-size:0.85rem;color:#333;font-weight:500;"></span>
-            <span style="color:#16a34a;font-size:0.85rem;">(Synced)</span>
-            <button class="inline-btn" onclick="handleSignOut()" style="margin-left:auto;">Sign out</button>
-        </div>
-    </div>
-
-    <!-- Share Mode View (hidden by default) -->
-    <div id="share-mode-view" style="display:none;padding:1rem;max-width:900px;margin:0 auto;">
-        <div class="card">
-            <h2>Doctor Summary (Read Only)</h2>
-            <p class="helper" style="margin-top:0;">This is a read-only summary shared by the patient. Link expires in 7 days.</p>
-            <div id="share-summary-content" style="margin-top:1rem;">
-                <div class="empty-state">Loading summary...</div>
-            </div>
-        </div>
-    </div>
-
     <main id="main-app">
         <div class="tabs">
             <button class="tab" onclick="showTab('info')">Info</button>
@@ -331,16 +304,6 @@
                 <button class="primary reset-btn" onclick="resetDemoData()">Reset Demo Data</button>
             </div>
 
-            <!-- Doctor Share Link (only shown when logged in) -->
-            <div id="doctor-share-section" class="card" style="display:none;">
-                <h2>Share with Doctor</h2>
-                <p class="helper" style="margin-top:0;">Generate a read-only link that expires in 7 days. No login required for doctor.</p>
-                <button class="primary" onclick="handleCreateDoctorLink()" id="generate-doctor-link-btn">Generate Doctor Link (7 days)</button>
-                <div id="doctor-link-output" style="display:none;margin-top:1rem;">
-                    <input type="text" id="doctor-link-url" readonly class="inline-input" style="width:100%;margin-bottom:0.5rem;" />
-                    <button class="inline-btn" onclick="copyDoctorLink()" style="width:100%;">Copy Link</button>
-                </div>
-            </div>
         </div>
 
         <!-- Info Tab -->
@@ -436,7 +399,6 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="tracker.js"></script>
     <script>
         // Generate demo data dynamically relative to current date (past 3 months)
@@ -1401,216 +1363,6 @@
                 .then(reg => console.log('SW registered:', reg.scope))
                 .catch(err => console.error('SW registration failed:', err));
         }
-
-        // =============================================================================
-        // SUPABASE AUTH & SYNC INITIALIZATION
-        // =============================================================================
-
-        let pendingEmail = null; // Store email for code verification
-
-        async function handleSendCode() {
-            const email = document.getElementById('auth-email').value.trim();
-            if (!email) {
-                document.getElementById('auth-status').textContent = 'Enter your email';
-                return;
-            }
-            const btn = document.getElementById('send-code-btn');
-            try {
-                btn.disabled = true;
-                document.getElementById('auth-status').textContent = 'Sending code...';
-                const result = await requestLoginCode(email);
-                pendingEmail = email;
-
-                // In dev mode (no email service), show the code
-                if (result.code) {
-                    document.getElementById('auth-status').textContent = `Dev mode - Code: ${result.code}`;
-                    document.getElementById('auth-code').value = result.code;
-                } else {
-                    document.getElementById('auth-status').textContent = 'Code sent! Check your email.';
-                }
-                btn.textContent = 'Resend';
-            } catch (e) {
-                document.getElementById('auth-status').textContent = 'Error: ' + e.message;
-            } finally {
-                btn.disabled = false;
-            }
-        }
-
-        async function handleVerifyCode() {
-            const email = document.getElementById('auth-email').value.trim() || pendingEmail;
-            const code = document.getElementById('auth-code').value.trim();
-            if (!email) {
-                document.getElementById('auth-status').textContent = 'Enter your email first';
-                return;
-            }
-            if (!code) {
-                document.getElementById('auth-status').textContent = 'Enter the 6-digit code';
-                return;
-            }
-            try {
-                document.getElementById('auth-status').textContent = 'Verifying...';
-                await verifyLoginCode(email, code);
-                document.getElementById('auth-status').textContent = 'Signed in!';
-                document.getElementById('auth-code').value = '';
-            } catch (e) {
-                document.getElementById('auth-status').textContent = 'Error: ' + e.message;
-            }
-        }
-
-        async function handleSignOut() {
-            await signOut();
-            updateAuthUI(null);
-        }
-
-        function updateAuthUI(session) {
-            const syncSection = document.getElementById('sync-section');
-            const loggedOut = document.getElementById('auth-logged-out');
-            const loggedIn = document.getElementById('auth-logged-in');
-            const userEmail = document.getElementById('auth-user-email');
-            const doctorShareSection = document.getElementById('doctor-share-section');
-
-            if (session && session.user) {
-                loggedOut.style.display = 'none';
-                loggedIn.style.display = 'flex';
-                userEmail.textContent = session.user.email;
-                if (doctorShareSection) doctorShareSection.style.display = 'block';
-            } else {
-                loggedOut.style.display = 'flex';
-                loggedIn.style.display = 'none';
-                if (doctorShareSection) doctorShareSection.style.display = 'none';
-            }
-        }
-
-        async function handleCreateDoctorLink() {
-            const btn = document.getElementById('generate-doctor-link-btn');
-            const output = document.getElementById('doctor-link-output');
-            const urlInput = document.getElementById('doctor-link-url');
-            try {
-                btn.textContent = 'Generating...';
-                btn.disabled = true;
-                const link = await createDoctorShareLink();
-                urlInput.value = link;
-                output.style.display = 'block';
-                btn.textContent = 'Generate Another Link';
-                btn.disabled = false;
-            } catch (e) {
-                alert('Error: ' + e.message);
-                btn.textContent = 'Generate Doctor Link (7 days)';
-                btn.disabled = false;
-            }
-        }
-
-        function copyDoctorLink() {
-            const urlInput = document.getElementById('doctor-link-url');
-            urlInput.select();
-            document.execCommand('copy');
-            alert('Link copied to clipboard!');
-        }
-
-        function renderShareSummary(summary) {
-            const container = document.getElementById('share-summary-content');
-            if (summary.error) {
-                container.innerHTML = `<div class="empty-state" style="color:#dc2626;">${summary.error}</div>`;
-                return;
-            }
-
-            const dateRange = summary.date_range || {};
-            const topSymptoms = summary.top_symptoms || [];
-            const severityCounts = summary.severity_counts || {};
-
-            let html = `<div style="margin-bottom:1rem;">
-                <strong>Date Range:</strong> ${dateRange.start || 'N/A'} to ${dateRange.end || 'N/A'}<br/>
-                <strong>Total Entries:</strong> ${summary.total_entries || 0}
-            </div>`;
-
-            if (topSymptoms.length > 0) {
-                html += `<div style="margin-bottom:1rem;">
-                    <strong>Top Symptoms:</strong>
-                    <ul style="margin-top:0.5rem;padding-left:1.5rem;">
-                        ${topSymptoms.map(s => `<li>${s.symptom.replace(/_/g, ' ')}: ${s.count} occurrences</li>`).join('')}
-                    </ul>
-                </div>`;
-            }
-
-            if (Object.keys(severityCounts).length > 0) {
-                html += `<div>
-                    <strong>Severity Distribution:</strong>
-                    <ul style="margin-top:0.5rem;padding-left:1.5rem;">
-                        ${Object.entries(severityCounts).map(([k, v]) => `<li>${k.replace('severity_', 'Severity ')}: ${v}</li>`).join('')}
-                    </ul>
-                </div>`;
-            }
-
-            html += `<div class="helper" style="margin-top:1rem;">Generated: ${new Date(summary.generated_at).toLocaleString()}</div>`;
-
-            container.innerHTML = html;
-        }
-
-        async function initializeApp() {
-            // Check for share mode first
-            const shareToken = checkShareMode();
-            if (shareToken) {
-                // Hide main app, show share view
-                document.getElementById('main-app').style.display = 'none';
-                document.getElementById('sync-section').style.display = 'none';
-                document.getElementById('share-mode-view').style.display = 'block';
-                // Hide demo banner in share mode
-                const demoBanner = document.querySelector('.demo-banner');
-                if (demoBanner) demoBanner.style.display = 'none';
-
-                try {
-                    const summary = await fetchDoctorSummary(shareToken);
-                    renderShareSummary(summary);
-                } catch (e) {
-                    renderShareSummary({ error: e.message });
-                }
-                return;
-            }
-
-            // Normal mode - initialize Supabase
-            if (initSupabase()) {
-                document.getElementById('sync-section').style.display = 'block';
-
-                // Check existing session
-                const session = await getSession();
-                if (session) {
-                    currentUser = session.user;
-                    await ensureHousehold();
-                    updateAuthUI(session);
-                } else {
-                    updateAuthUI(null);
-                }
-
-                // Listen for auth changes
-                onAuthStateChange(async (event, session) => {
-                    updateAuthUI(session);
-                    if (session) {
-                        await ensureHousehold();
-
-                        // Fetch remote entries on login (for new device sync)
-                        try {
-                            const remoteEntries = await fetchEntriesFromSupabase();
-                            if (remoteEntries.length > 0) {
-                                const localEntries = getEntries();
-                                const mergedMap = new Map();
-                                localEntries.forEach(e => mergedMap.set(e.id, e));
-                                remoteEntries.forEach(e => mergedMap.set(e.id, e));
-                                const merged = Array.from(mergedMap.values());
-                                merged.sort((a, b) => new Date(b.date) - new Date(a.date));
-                                saveEntries(merged);
-                                renderHistory();
-                                buildEffectList('effect-list', 'patient');
-                            }
-                        } catch (e) {
-                            console.error('Sync error:', e);
-                        }
-                    }
-                });
-            }
-        }
-
-        // Initialize
-        initializeApp();
     </script>
 </body>
 </html>

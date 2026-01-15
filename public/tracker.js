@@ -13,6 +13,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 let supabaseClient = null;
 let currentUser = null;
 let currentHouseholdId = null;
+let currentUserRole = null; // 'patient' or 'partner'
 let isShareMode = false;
 
 function getAppBaseUrl() {
@@ -96,61 +97,7 @@ async function signOut() {
     await supabaseClient.auth.signOut();
     currentUser = null;
     currentHouseholdId = null;
-}
-
-// =============================================================================
-// CODE-BASED AUTH (PWA-friendly, no redirect required)
-// =============================================================================
-
-async function requestLoginCode(email) {
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/request-login-code`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-    });
-    const data = await response.json();
-    if (!response.ok) {
-        throw new Error(data.error || 'Failed to request code');
-    }
-    return data;
-}
-
-async function verifyLoginCode(email, code) {
-    if (!supabaseClient) throw new Error('Supabase not initialized');
-
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/verify-login-code`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, code })
-    });
-    const data = await response.json();
-    if (!response.ok) {
-        throw new Error(data.error || 'Invalid code');
-    }
-
-    // If we got session tokens directly, set them
-    if (data.access_token && data.refresh_token) {
-        const { error } = await supabaseClient.auth.setSession({
-            access_token: data.access_token,
-            refresh_token: data.refresh_token
-        });
-        if (error) throw error;
-        return { success: true };
-    }
-
-    // If we got a token for verifyOtp, use that
-    if (data.token) {
-        const verifyType = data.type === 'token_hash' ? 'magiclink' : 'email';
-        const { error } = await supabaseClient.auth.verifyOtp({
-            email,
-            token: data.token,
-            type: verifyType
-        });
-        if (error) throw error;
-        return { success: true };
-    }
-
-    throw new Error('Unexpected response from server');
+    currentUserRole = null;
 }
 
 async function getSession() {
@@ -174,19 +121,33 @@ function onAuthStateChange(callback) {
 async function ensureHousehold() {
     if (!supabaseClient || !currentUser) return null;
 
-    // Check if household exists
-    const { data: existing, error: selectError } = await supabaseClient
+    // First check if user owns a household
+    const { data: ownedHousehold } = await supabaseClient
         .from('households')
         .select('id')
         .eq('owner_user_id', currentUser.id)
         .single();
 
-    if (existing) {
-        currentHouseholdId = existing.id;
-        return existing.id;
+    if (ownedHousehold) {
+        currentHouseholdId = ownedHousehold.id;
+        currentUserRole = 'patient';
+        return ownedHousehold.id;
     }
 
-    // Create household
+    // Check if user is a member of a household (partner)
+    const { data: membership } = await supabaseClient
+        .from('household_members')
+        .select('household_id, role')
+        .eq('user_id', currentUser.id)
+        .single();
+
+    if (membership) {
+        currentHouseholdId = membership.household_id;
+        currentUserRole = membership.role || 'partner';
+        return membership.household_id;
+    }
+
+    // No household yet - create one (user becomes patient/owner)
     const { data: created, error: insertError } = await supabaseClient
         .from('households')
         .insert({ owner_user_id: currentUser.id })
@@ -195,7 +156,74 @@ async function ensureHousehold() {
 
     if (insertError) throw insertError;
     currentHouseholdId = created.id;
+    currentUserRole = 'patient';
     return created.id;
+}
+
+// =============================================================================
+// PARTNER INVITE FUNCTIONS
+// =============================================================================
+
+async function createPartnerInvite(partnerEmail) {
+    if (!supabaseClient || !currentHouseholdId) throw new Error('Not authenticated');
+    if (currentUserRole !== 'patient') throw new Error('Only patient can invite partners');
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    const { error } = await supabaseClient
+        .from('household_invites')
+        .insert({
+            household_id: currentHouseholdId,
+            invited_email: partnerEmail.toLowerCase().trim(),
+            role: 'partner',
+            expires_at: expiresAt.toISOString()
+        });
+
+    if (error) throw error;
+    return { success: true };
+}
+
+async function claimHouseholdInvite() {
+    if (!supabaseClient || !currentUser) return null;
+
+    // Call the edge function to claim any pending invite
+    const session = await getSession();
+    if (!session) return null;
+
+    try {
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/claim-household-invite`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`
+            }
+        });
+
+        if (!response.ok) {
+            // No invite found or error - not a problem, just means no invite
+            return null;
+        }
+
+        const data = await response.json();
+        if (data.success && data.household_id) {
+            currentHouseholdId = data.household_id;
+            currentUserRole = data.role || 'partner';
+            return data;
+        }
+    } catch (e) {
+        // Ignore errors - just means no invite to claim
+        console.log('No invite to claim or error:', e.message);
+    }
+    return null;
+}
+
+function getUserRole() {
+    return currentUserRole;
+}
+
+function getHouseholdId() {
+    return currentHouseholdId;
 }
 
 // =============================================================================
@@ -827,10 +855,15 @@ if (typeof module !== 'undefined' && module.exports) {
         // Supabase functions (browser only, stubs for Node)
         initSupabase: typeof initSupabase !== 'undefined' ? initSupabase : () => false,
         signInWithMagicLink: typeof signInWithMagicLink !== 'undefined' ? signInWithMagicLink : async () => {},
+        verifyEmailOtp: typeof verifyEmailOtp !== 'undefined' ? verifyEmailOtp : async () => {},
         signOut: typeof signOut !== 'undefined' ? signOut : async () => {},
         getSession: typeof getSession !== 'undefined' ? getSession : async () => null,
         onAuthStateChange: typeof onAuthStateChange !== 'undefined' ? onAuthStateChange : () => {},
         ensureHousehold: typeof ensureHousehold !== 'undefined' ? ensureHousehold : async () => null,
+        getUserRole: typeof getUserRole !== 'undefined' ? getUserRole : () => null,
+        getHouseholdId: typeof getHouseholdId !== 'undefined' ? getHouseholdId : () => null,
+        createPartnerInvite: typeof createPartnerInvite !== 'undefined' ? createPartnerInvite : async () => {},
+        claimHouseholdInvite: typeof claimHouseholdInvite !== 'undefined' ? claimHouseholdInvite : async () => null,
         syncEntriesToSupabase: typeof syncEntriesToSupabase !== 'undefined' ? syncEntriesToSupabase : async () => {},
         fetchEntriesFromSupabase: typeof fetchEntriesFromSupabase !== 'undefined' ? fetchEntriesFromSupabase : async () => [],
         deleteEntryFromSupabase: typeof deleteEntryFromSupabase !== 'undefined' ? deleteEntryFromSupabase : async () => {},
