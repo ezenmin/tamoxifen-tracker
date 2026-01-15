@@ -372,7 +372,7 @@
         <div id="auth-logged-out" style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;">
             <input type="email" id="auth-email" placeholder="Email for sync" class="inline-input" style="flex:1;min-width:180px;" />
             <button class="inline-btn" id="send-email-btn" onclick="handleSendEmail()">Send sign-in email</button>
-            <input type="text" id="auth-code" inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code" class="inline-input" style="width:100px;" maxlength="6" />
+            <input type="text" id="auth-code" inputmode="numeric" autocomplete="one-time-code" placeholder="Code from email" class="inline-input" style="width:110px;" maxlength="8" />
             <button class="inline-btn" onclick="handleVerifyCode()">Verify code</button>
             <span id="auth-status" style="font-size:0.85rem;color:#666;"></span>
         </div>
@@ -1616,7 +1616,7 @@
                 document.getElementById('auth-status').textContent = 'Sending...';
                 await signInWithMagicLink(email);
                 pendingEmail = email;
-                document.getElementById('auth-status').textContent = 'Check your email! Click the link OR copy the 6-digit code.';
+                document.getElementById('auth-status').textContent = 'Check your email! Click the link OR copy the code.';
                 btn.textContent = 'Resend email';
             } catch (e) {
                 document.getElementById('auth-status').textContent = 'Error: ' + e.message;
@@ -1633,7 +1633,7 @@
                 return;
             }
             if (!code) {
-                document.getElementById('auth-status').textContent = 'Enter the 6-digit code from the email';
+                document.getElementById('auth-status').textContent = 'Enter the code from the email';
                 return;
             }
             try {
