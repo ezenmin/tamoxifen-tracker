@@ -1171,17 +1171,44 @@
             }
 
             try {
-                const entry = createEventEntry(type, '');
-                entry.author = 'patient';
                 const entries = getEntries();
-                entry.date = getSelectedLogDate('patient').toISOString();
-                entries.unshift(entry);
-                entries.sort((a, b) => new Date(b.date) - new Date(a.date));
-                saveEntries(entries);
-                
-                // Sync to Supabase
-                if (typeof saveOrDeleteEntryToSupabase === 'function') {
-                    saveOrDeleteEntryToSupabase(entry).catch(e => console.error('Sync error:', e));
+                const selectedDate = getSelectedLogDate('patient');
+                const todayStart = startOfDay(selectedDate);
+                const todayEnd = endOfDay(selectedDate);
+
+                // Find existing menstrual event of same type on same day
+                const existingIdx = entries.findIndex(e =>
+                    e.event === true &&
+                    e.type === type &&
+                    new Date(e.date) >= todayStart &&
+                    new Date(e.date) <= todayEnd
+                );
+
+                let entryToSync;
+                if (existingIdx >= 0) {
+                    // Already exists for today - clicking again removes it (toggle behavior)
+                    entryToSync = { ...entries[existingIdx], severity: null }; // Mark for deletion
+                    entries.splice(existingIdx, 1);
+                    saveEntries(entries);
+                    
+                    // Delete from Supabase
+                    if (typeof deleteEntryFromSupabase === 'function') {
+                        deleteEntryFromSupabase(entryToSync.id).catch(e => console.error('Delete error:', e));
+                    }
+                } else {
+                    // Create new entry
+                    const entry = createEventEntry(type, '');
+                    entry.author = 'patient';
+                    entry.date = selectedDate.toISOString();
+                    entries.unshift(entry);
+                    entries.sort((a, b) => new Date(b.date) - new Date(a.date));
+                    saveEntries(entries);
+                    entryToSync = entry;
+                    
+                    // Sync to Supabase
+                    if (typeof saveOrDeleteEntryToSupabase === 'function') {
+                        saveOrDeleteEntryToSupabase(entry).catch(e => console.error('Sync error:', e));
+                    }
                 }
                 
                 renderHistory();
