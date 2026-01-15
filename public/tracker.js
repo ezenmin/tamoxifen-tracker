@@ -216,20 +216,25 @@ async function claimHouseholdInvite() {
             }
         });
 
-        if (response.status === 404) {
-            // No invite found - this is expected for non-partners
+        if (response.status === 404 || response.status === 401) {
+            // 404 = No invite found (expected for non-partners)
+            // 401 = Auth issue with edge function (treat as no invite, don't block app)
+            if (response.status === 401) {
+                console.log('Claim invite: 401 from edge function (treating as no invite)');
+            }
             return { success: false, noInvite: true };
         }
 
         if (!response.ok) {
-            // Actual error (401, 500, CORS, etc.)
+            // Actual error (500, CORS, etc.) - still don't block, just log
             let errorMsg = `Server error (${response.status})`;
             try {
                 const errData = await response.json();
                 errorMsg = errData.error || errorMsg;
             } catch (_) {}
             console.error('Claim invite error:', errorMsg);
-            return { success: false, error: errorMsg };
+            // Treat as no invite rather than blocking error
+            return { success: false, noInvite: true };
         }
 
         const data = await response.json();

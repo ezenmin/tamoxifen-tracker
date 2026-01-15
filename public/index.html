@@ -930,8 +930,10 @@
 
             // Only patient can log in patient tab
             const role = getUserRole();
-            if (role && role !== 'patient') {
-                alert('Only the patient can log entries here. Partners use the Partner tab.');
+            if (role !== 'patient') {
+                alert(role === 'partner'
+                    ? 'Only the patient can log entries here. Partners use the Partner tab.'
+                    : 'Please sign in first.');
                 return;
             }
 
@@ -950,6 +952,23 @@
                     new Date(e.date) >= todayStart &&
                     new Date(e.date) <= todayEnd
                 );
+
+                if (existingIdx >= 0 && entries[existingIdx].severity === severity) {
+                    // Clicked same severity - UNSELECT (delete the entry)
+                    const entryId = entries[existingIdx].id;
+                    entries.splice(existingIdx, 1);
+                    saveEntries(entries);
+                    // Also delete from Supabase
+                    deleteEntryFromSupabase(entryId).catch(e => console.error('Delete error:', e));
+                    renderHistory();
+                    buildEffectList('effect-list', 'patient');
+                    if (dot) {
+                        const row = dot.closest('.effect-item');
+                        if (row) row.querySelectorAll('.dot').forEach(d => d.classList.remove('logged'));
+                        dot.classList.remove('logging');
+                    }
+                    return;
+                }
 
                 if (existingIdx >= 0) {
                     // Update existing entry
@@ -986,8 +1005,10 @@
 
             // Only partner can log in partner tab
             const role = getUserRole();
-            if (role && role !== 'partner') {
-                alert('Only the partner can log observations here. Patients use the Log tab.');
+            if (role !== 'partner') {
+                alert(role === 'patient'
+                    ? 'Only the partner can log observations here. Patients use the Log tab.'
+                    : 'Please sign in first.');
                 return;
             }
 
@@ -1005,6 +1026,23 @@
                     new Date(e.date) >= todayStart &&
                     new Date(e.date) <= todayEnd
                 );
+
+                if (existingIdx >= 0 && observations[existingIdx].severity === severity) {
+                    // Clicked same severity - UNSELECT (delete the entry)
+                    const entryId = observations[existingIdx].id;
+                    observations.splice(existingIdx, 1);
+                    savePartnerObservations(observations);
+                    // Also delete from Supabase
+                    deleteEntryFromSupabase(entryId).catch(e => console.error('Delete error:', e));
+                    renderPartnerHistory();
+                    buildEffectList('partner-effect-list', 'partner');
+                    if (dot) {
+                        const row = dot.closest('.effect-item');
+                        if (row) row.querySelectorAll('.dot').forEach(d => d.classList.remove('logged'));
+                        dot.classList.remove('logging');
+                    }
+                    return;
+                }
 
                 if (existingIdx >= 0) {
                     // Update existing entry
@@ -1037,8 +1075,10 @@
         function logMenstrualEvent(type) {
             // Only patient can log menstrual events
             const role = getUserRole();
-            if (role && role !== 'patient') {
-                alert('Only the patient can log menstrual events.');
+            if (role !== 'patient') {
+                alert(role === 'partner'
+                    ? 'Only the patient can log menstrual events.'
+                    : 'Please sign in first.');
                 return;
             }
 
@@ -1062,8 +1102,10 @@
         function logWeightChange() {
             // Only patient can log weight
             const role = getUserRole();
-            if (role && role !== 'patient') {
-                alert('Only the patient can log weight changes.');
+            if (role !== 'patient') {
+                alert(role === 'partner'
+                    ? 'Only the patient can log weight changes.'
+                    : 'Please sign in first.');
                 return;
             }
 
@@ -1843,20 +1885,13 @@
                     // Try to claim any pending household invite (for partners)
                     const claimResult = await claimHouseholdInvite();
 
-                    if (claimResult.error) {
-                        // Actual error - show message, don't create new household
-                        document.getElementById('auth-status').textContent = 'Error joining household: ' + claimResult.error;
-                        console.error('Claim invite error:', claimResult.error);
-                        // Still update UI to show logged-in state but with error
-                        updateAuthUI(session);
-                        return;
-                    }
-
-                    if (!claimResult.success) {
-                        // No invite to claim (noInvite: true) - proceed to ensureHousehold
+                    if (claimResult.success) {
+                        // Invite claimed - household/role already set
+                        console.log('Invite claimed successfully');
+                    } else {
+                        // No invite (or error treated as no invite) - proceed to ensureHousehold
                         await ensureHousehold();
                     }
-                    // If claimResult.success, household/role already set by claimHouseholdInvite
 
                     updateAuthUI(session);
 
@@ -1892,19 +1927,13 @@
                         // Try to claim any pending household invite (for partners)
                         const claimResult = await claimHouseholdInvite();
 
-                        if (claimResult.error) {
-                            // Actual error - show message, don't create new household
-                            document.getElementById('auth-status').textContent = 'Error joining household: ' + claimResult.error;
-                            console.error('Claim invite error:', claimResult.error);
-                            updateAuthUI(session);
-                            return;
-                        }
-
-                        if (!claimResult.success) {
-                            // No invite to claim - proceed to ensureHousehold
+                        if (claimResult.success) {
+                            // Invite claimed - household/role already set
+                            console.log('Invite claimed successfully');
+                        } else {
+                            // No invite (or error treated as no invite) - proceed to ensureHousehold
                             await ensureHousehold();
                         }
-                        // If claimResult.success, household/role already set
 
                         updateAuthUI(session); // Update UI again after role is determined
 
