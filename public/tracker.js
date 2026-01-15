@@ -34,19 +34,52 @@ function getAppBaseUrl() {
     return origin + basePath;
 }
 
+// Safe localStorage wrapper for PWA environments
+// Some mobile browsers/PWAs can have issues with localStorage access
+const safeLocalStorage = {
+    getItem: (key) => {
+        try {
+            return window.localStorage.getItem(key);
+        } catch (e) {
+            console.error('localStorage.getItem failed:', e);
+            return null;
+        }
+    },
+    setItem: (key, value) => {
+        try {
+            window.localStorage.setItem(key, value);
+        } catch (e) {
+            console.error('localStorage.setItem failed:', e);
+        }
+    },
+    removeItem: (key) => {
+        try {
+            window.localStorage.removeItem(key);
+        } catch (e) {
+            console.error('localStorage.removeItem failed:', e);
+        }
+    }
+};
+
 // Initialize Supabase client if available
 function initSupabase() {
     if (typeof window !== 'undefined' && window.supabase && window.supabase.createClient) {
-        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-            auth: {
-                persistSession: true,
-                autoRefreshToken: true,
-                detectSessionInUrl: true,
-                storage: window.localStorage,
-                storageKey: 'tamoxifen-auth'
-            }
-        });
-        return true;
+        try {
+            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                auth: {
+                    persistSession: true,
+                    autoRefreshToken: true,
+                    detectSessionInUrl: true,
+                    storage: safeLocalStorage,
+                    storageKey: 'tamoxifen-auth',
+                    flowType: 'pkce'
+                }
+            });
+            return true;
+        } catch (e) {
+            console.error('Failed to initialize Supabase client:', e);
+            return false;
+        }
     }
     return false;
 }
@@ -72,7 +105,9 @@ async function verifyEmailOtp(email, token) {
     if (!email) throw new Error('Email is required');
     if (!cleanedToken) throw new Error('Code is required');
 
-    // Supabase supports multiple OTP “types” depending on configuration.
+    console.log('verifyEmailOtp: Starting verification for', email);
+
+    // Supabase supports multiple OTP "types" depending on configuration.
     // Try the common one first, then fall back.
     const attempts = [
         { type: 'email', label: 'email' },
@@ -81,6 +116,7 @@ async function verifyEmailOtp(email, token) {
 
     let lastError = null;
     for (const attempt of attempts) {
+        console.log('verifyEmailOtp: Trying type', attempt.type);
         // verifyOtp throws in some environments; normalize to { data, error }
         // eslint-disable-next-line no-await-in-loop
         const result = await supabaseClient.auth.verifyOtp({
@@ -91,9 +127,27 @@ async function verifyEmailOtp(email, token) {
 
         const error = result?.error;
         if (!error) {
-            return { success: true, session: result?.data?.session || null };
+            const session = result?.data?.session;
+            console.log('verifyEmailOtp: Success, session:', session ? 'present' : 'null');
+
+            // Verify the session was properly stored
+            if (session) {
+                // Small delay to ensure storage is complete
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                // Verify we can read the session back
+                try {
+                    const storedSession = await getSession();
+                    console.log('verifyEmailOtp: Stored session verification:', storedSession ? 'valid' : 'null');
+                } catch (e) {
+                    console.error('verifyEmailOtp: Session verification failed:', e);
+                }
+            }
+
+            return { success: true, session };
         }
         lastError = error;
+        console.log('verifyEmailOtp: Type', attempt.type, 'failed:', error.message);
     }
 
     const message = lastError?.message || String(lastError || 'Invalid code');
@@ -110,15 +164,29 @@ async function signOut() {
 
 async function getSession() {
     if (!supabaseClient) return null;
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    return session;
+    try {
+        const { data: { session }, error } = await supabaseClient.auth.getSession();
+        if (error) {
+            console.error('getSession error:', error);
+            return null;
+        }
+        return session;
+    } catch (e) {
+        console.error('getSession exception:', e);
+        return null;
+    }
 }
 
 function onAuthStateChange(callback) {
     if (!supabaseClient) return { data: { subscription: { unsubscribe: () => {} } } };
     return supabaseClient.auth.onAuthStateChange((event, session) => {
+        console.log('Supabase auth event:', event, session ? 'session present' : 'no session');
         currentUser = session?.user || null;
-        callback(event, session);
+        try {
+            callback(event, session);
+        } catch (e) {
+            console.error('Auth state change callback error:', e);
+        }
     });
 }
 

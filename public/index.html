@@ -2312,6 +2312,89 @@
             container.innerHTML = html;
         }
 
+        // Guard against concurrent auth event processing
+        let authEventProcessing = false;
+        let lastProcessedEvent = null;
+        let initialSessionEstablished = false;
+
+        // Helper to safely process auth session setup
+        async function processAuthSession(session, eventSource) {
+            if (!session) return;
+
+            debugLog(`processAuthSession START (${eventSource})`);
+
+            // Try to claim any pending household invite (for partners)
+            try {
+                const claimResult = await claimHouseholdInvite();
+                debugLog(`${eventSource} claim: ${JSON.stringify(claimResult)}`);
+
+                if (claimResult.success) {
+                    debugLog(`${eventSource} invite claimed - role: ${claimResult.role}`);
+                } else {
+                    await ensureHousehold();
+                    debugLog(`${eventSource} ensureHousehold done - role: ${getUserRole()}`);
+                }
+            } catch (e) {
+                debugLog(`${eventSource} claim/ensure ERROR: ${e.message}`);
+            }
+
+            // Fetch names from Supabase and update localStorage
+            try {
+                await fetchNamesFromSupabase();
+                debugLog(`${eventSource} names fetched`);
+            } catch (e) {
+                debugLog(`${eventSource} names ERROR: ${e.message}`);
+            }
+
+            try {
+                document.getElementById('patient-name').value = getName(PATIENT_NAME_KEY);
+                document.getElementById('partner-name').value = getName(PARTNER_NAME_KEY);
+                updateTabLabels();
+            } catch (e) {
+                debugLog(`${eventSource} UI update ERROR: ${e.message}`);
+            }
+
+            updateAuthUI(session);
+            debugLog(`${eventSource} Auth UI updated - role: ${getUserRole()}`);
+
+            // Set default tab based on role
+            setDefaultTab();
+
+            // Fetch remote entries - remote is source of truth
+            try {
+                const remoteEntries = await fetchEntriesFromSupabase();
+                debugLog(`${eventSource} fetched ${remoteEntries.length} entries`);
+                // Split by author and save to appropriate localStorage
+                if (remoteEntries.length > 0) {
+                    const patientEntries = remoteEntries.filter(e => (e.author || 'patient') === 'patient');
+                    const partnerEntries = remoteEntries.filter(e => e.author === 'partner');
+
+                    patientEntries.sort((a, b) => new Date(b.date) - new Date(a.date));
+                    partnerEntries.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                    // Use originalSaveEntries if available (from the overridden saveEntries)
+                    if (typeof originalSaveEntries === 'function') {
+                        originalSaveEntries(patientEntries);
+                    } else {
+                        saveEntries(patientEntries);
+                    }
+                    savePartnerObservations(partnerEntries);
+                }
+                renderHistory();
+                renderPartnerHistory();
+                buildEffectList('effect-list', 'patient');
+                updateCharts();
+            } catch (e) {
+                debugLog(`${eventSource} sync ERROR: ${e.message}`);
+                console.error('Sync error:', e);
+            }
+
+            // Render partner management section (patient only)
+            renderPartnerManagement();
+
+            debugLog(`processAuthSession END (${eventSource})`);
+        }
+
         async function initializeApp() {
             // Check for share mode first
             const shareToken = checkShareMode();
@@ -2333,134 +2416,97 @@
             // Normal mode - initialize Supabase
             if (initSupabase()) {
                 debugLog('Supabase initialized');
-                document.getElementById('sync-section').style.display = 'block';
 
-                // Check existing session
-                const session = await getSession();
-                debugLog('Session check: ' + (session ? session.user.email : 'none'));
+                try {
+                    document.getElementById('sync-section').style.display = 'block';
+                } catch (e) {
+                    debugLog('sync-section display ERROR: ' + e.message);
+                }
+
+                // Check existing session with comprehensive error handling
+                let session = null;
+                try {
+                    debugLog('Calling getSession...');
+                    session = await getSession();
+                    debugLog('Session result: ' + (session ? session.user.email : 'null'));
+                } catch (e) {
+                    debugLog('getSession ERROR: ' + e.message);
+                    console.error('getSession failed:', e);
+                }
                 if (session) {
                     currentUser = session.user;
-
-                    // Try to claim any pending household invite (for partners)
-                    try {
-                        const claimResult = await claimHouseholdInvite();
-                        debugLog('Claim result: ' + JSON.stringify(claimResult));
-
-                        if (claimResult.success) {
-                            debugLog('Invite claimed - role: ' + claimResult.role);
-                        } else {
-                            // No invite (or error treated as no invite) - proceed to ensureHousehold
-                            await ensureHousehold();
-                            debugLog('ensureHousehold done - role: ' + getUserRole());
-                        }
-                    } catch (e) {
-                        debugLog('ERROR in claim/ensure: ' + e.message);
-                    }
-
-                    // Fetch names from Supabase and update localStorage
-                    try {
-                        await fetchNamesFromSupabase();
-                        debugLog('Names fetched');
-                    } catch (e) {
-                        debugLog('ERROR fetching names: ' + e.message);
-                    }
-                    document.getElementById('patient-name').value = getName(PATIENT_NAME_KEY);
-                    document.getElementById('partner-name').value = getName(PARTNER_NAME_KEY);
-                    updateTabLabels();
-
-                    updateAuthUI(session);
-                    debugLog('Auth UI updated - role: ' + getUserRole());
-
-                    // Set default tab based on role
-                    setDefaultTab();
-
-                    // Sync entries from Supabase - remote is source of truth
-                    try {
-                        const remoteEntries = await fetchEntriesFromSupabase();
-                        // Split by author and save to appropriate localStorage
-                        if (remoteEntries.length > 0) {
-                            const patientEntries = remoteEntries.filter(e => (e.author || 'patient') === 'patient');
-                            const partnerEntries = remoteEntries.filter(e => e.author === 'partner');
-                            
-                            patientEntries.sort((a, b) => new Date(b.date) - new Date(a.date));
-                            partnerEntries.sort((a, b) => new Date(b.date) - new Date(a.date));
-                            
-                            saveEntries(patientEntries);
-                            savePartnerObservations(partnerEntries);
-                        }
-                        renderHistory();
-                        renderPartnerHistory();
-                        buildEffectList('effect-list', 'patient');
-                        updateCharts();
-                    } catch (e) {
-                        console.error('Sync error:', e);
-                    }
-
-                    // Render partner management section (patient only)
-                    renderPartnerManagement();
+                    initialSessionEstablished = true;
+                    debugLog('Initial session established');
+                    await processAuthSession(session, 'init');
                 } else {
+                    debugLog('No existing session');
                     updateAuthUI(null);
                 }
 
-                // Listen for auth changes
+                // Listen for auth changes with protection against race conditions
                 onAuthStateChange(async (event, session) => {
-                    debugLog('Auth event: ' + event + ', session: ' + (session ? 'yes' : 'no'));
-                    updateAuthUI(session);
+                    const eventKey = `${event}-${session?.user?.id || 'none'}`;
+                    debugLog(`Auth event: ${event}, session: ${session ? 'yes' : 'no'}, key: ${eventKey}`);
+
+                    // Prevent duplicate processing of the same event
+                    if (lastProcessedEvent === eventKey && event !== 'SIGNED_OUT') {
+                        debugLog('Skipping duplicate event');
+                        return;
+                    }
+
+                    // Handle SIGNED_OUT events carefully
+                    if (event === 'SIGNED_OUT') {
+                        // If we're still processing a SIGNED_IN event, this might be spurious
+                        if (authEventProcessing) {
+                            debugLog('SIGNED_OUT during auth processing - checking session validity');
+                            // Double-check if session actually exists
+                            try {
+                                const currentSession = await getSession();
+                                if (currentSession) {
+                                    debugLog('Session still valid, ignoring SIGNED_OUT');
+                                    return;
+                                }
+                            } catch (e) {
+                                debugLog('Error checking session during SIGNED_OUT: ' + e.message);
+                            }
+                        }
+
+                        debugLog('Processing SIGNED_OUT - clearing state');
+                        initialSessionEstablished = false;
+                        updateAuthUI(null);
+                        return;
+                    }
+
+                    // For SIGNED_IN and TOKEN_REFRESHED events
                     if (session) {
-                        // Try to claim any pending household invite (for partners)
-                        try {
-                            const claimResult = await claimHouseholdInvite();
-                            debugLog('onChange claim: ' + JSON.stringify(claimResult));
+                        // If already processing, skip to prevent race conditions
+                        if (authEventProcessing) {
+                            debugLog('Already processing auth event, queuing update');
+                            // Just update UI with current session
+                            updateAuthUI(session);
+                            return;
+                        }
 
-                            if (claimResult.success) {
-                                debugLog('onChange invite claimed');
-                            } else {
-                                await ensureHousehold();
-                                debugLog('onChange ensureHousehold done - role: ' + getUserRole());
+                        authEventProcessing = true;
+                        lastProcessedEvent = eventKey;
+
+                        try {
+                            // Show immediate feedback
+                            updateAuthUI(session);
+
+                            // Only do full processing for SIGNED_IN, not TOKEN_REFRESHED
+                            if (event === 'SIGNED_IN') {
+                                await processAuthSession(session, 'onChange');
+                                initialSessionEstablished = true;
+                            } else if (event === 'TOKEN_REFRESHED') {
+                                debugLog('Token refreshed - session maintained');
                             }
                         } catch (e) {
-                            debugLog('onChange ERROR: ' + e.message);
+                            debugLog('Error in auth event handler: ' + e.message);
+                            console.error('Auth event handler error:', e);
+                        } finally {
+                            authEventProcessing = false;
                         }
-
-                        // Fetch names from Supabase and update localStorage
-                        try {
-                            await fetchNamesFromSupabase();
-                        } catch (e) {
-                            debugLog('onChange names ERROR: ' + e.message);
-                        }
-                        document.getElementById('patient-name').value = getName(PATIENT_NAME_KEY);
-                        document.getElementById('partner-name').value = getName(PARTNER_NAME_KEY);
-                        updateTabLabels();
-
-                        updateAuthUI(session); // Update UI again after role is determined
-
-                        // Set default tab based on role
-                        setDefaultTab();
-
-                        // Fetch remote entries - remote is source of truth
-                        try {
-                            const remoteEntries = await fetchEntriesFromSupabase();
-                            // Split by author and save to appropriate localStorage
-                            if (remoteEntries.length > 0) {
-                                const patientEntries = remoteEntries.filter(e => (e.author || 'patient') === 'patient');
-                                const partnerEntries = remoteEntries.filter(e => e.author === 'partner');
-                                
-                                patientEntries.sort((a, b) => new Date(b.date) - new Date(a.date));
-                                partnerEntries.sort((a, b) => new Date(b.date) - new Date(a.date));
-                                
-                                originalSaveEntries(patientEntries);
-                                savePartnerObservations(partnerEntries);
-                            }
-                            renderHistory();
-                            renderPartnerHistory();
-                            buildEffectList('effect-list', 'patient');
-                            updateCharts();
-                        } catch (e) {
-                            console.error('Sync error:', e);
-                        }
-
-                        // Render partner management section (patient only)
-                        renderPartnerManagement();
                     }
                 });
             }
