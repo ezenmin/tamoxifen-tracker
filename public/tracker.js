@@ -378,6 +378,74 @@ async function revokeInvite(inviteId) {
     return true;
 }
 
+/**
+ * Sync patient/partner display name to Supabase
+ * @param {string} role - 'patient' or 'partner'
+ * @param {string} displayName - The name to sync
+ */
+async function syncNameToSupabase(role, displayName) {
+    if (!supabaseClient || !currentUser || !currentHouseholdId) return;
+
+    const trimmedName = (displayName || '').trim();
+
+    try {
+        if (role === 'patient') {
+            // Patient name goes in households table
+            await supabaseClient
+                .from('households')
+                .update({ patient_name: trimmedName })
+                .eq('id', currentHouseholdId);
+        } else {
+            // Partner name goes in household_members
+            await supabaseClient
+                .from('household_members')
+                .update({ display_name: trimmedName })
+                .eq('household_id', currentHouseholdId)
+                .eq('user_id', currentUser.id);
+        }
+        console.log(`Synced ${role} name to Supabase:`, trimmedName);
+    } catch (err) {
+        console.error('Failed to sync name:', err);
+    }
+}
+
+/**
+ * Fetch names from Supabase and populate localStorage
+ */
+async function fetchNamesFromSupabase() {
+    if (!supabaseClient || !currentHouseholdId) return;
+
+    try {
+        // Fetch patient name from households
+        const { data: household } = await supabaseClient
+            .from('households')
+            .select('patient_name')
+            .eq('id', currentHouseholdId)
+            .single();
+
+        if (household?.patient_name) {
+            localStorage.setItem('tamoxifen-patient-name', household.patient_name);
+        }
+
+        // Fetch partner name from household_members
+        const { data: members } = await supabaseClient
+            .from('household_members')
+            .select('display_name, role')
+            .eq('household_id', currentHouseholdId)
+            .eq('role', 'partner');
+
+        if (members?.[0]?.display_name) {
+            localStorage.setItem('tamoxifen-partner-name', members[0].display_name);
+        }
+
+        // Update UI if function exists
+        if (typeof updateTabLabels === 'function') updateTabLabels();
+
+    } catch (err) {
+        console.error('Failed to fetch names:', err);
+    }
+}
+
 // =============================================================================
 // SYNC FUNCTIONS
 // =============================================================================
@@ -1067,6 +1135,8 @@ if (typeof module !== 'undefined' && module.exports) {
         getHouseholdMembers: typeof getHouseholdMembers !== 'undefined' ? getHouseholdMembers : async () => [],
         removePartnerFromHousehold: typeof removePartnerFromHousehold !== 'undefined' ? removePartnerFromHousehold : async () => {},
         getPendingInvites: typeof getPendingInvites !== 'undefined' ? getPendingInvites : async () => [],
-        revokeInvite: typeof revokeInvite !== 'undefined' ? revokeInvite : async () => false
+        revokeInvite: typeof revokeInvite !== 'undefined' ? revokeInvite : async () => false,
+        syncNameToSupabase: typeof syncNameToSupabase !== 'undefined' ? syncNameToSupabase : async () => {},
+        fetchNamesFromSupabase: typeof fetchNamesFromSupabase !== 'undefined' ? fetchNamesFromSupabase : async () => {}
     };
 }

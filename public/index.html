@@ -389,7 +389,10 @@
                     <input type="email" id="partner-email" placeholder="Partner's email" class="inline-input" style="flex:1;min-width:180px;" />
                     <button class="inline-btn" onclick="handleInvitePartner()">Send invite</button>
                 </div>
-                <div class="helper" style="margin-top:0.25rem;font-size:0.75rem;">Invite expires in 7 days (only affects joining; once joined, partner stays connected until removed).</div>
+                <div class="helper" style="margin-top:0.25rem;font-size:0.75rem;line-height:1.4;">
+                    Invite expires in 7 days.<br/>
+                    Once joined, partner stays connected until removed.
+                </div>
                 <span id="invite-status" style="font-size:0.85rem;color:#666;"></span>
                 <!-- Current partner display + remove -->
                 <div id="current-partner-section" style="display:none;margin-top:0.5rem;padding-top:0.5rem;border-top:1px dashed #ddd;">
@@ -1712,6 +1715,28 @@
             buildHistoryTable('partner-history-table', observations, getAllTypes('partner'), false);
         }
 
+        // Debounce helper for name sync
+        function debounce(fn, delay) {
+            let timeoutId;
+            return function(...args) {
+                clearTimeout(timeoutId);
+                timeoutId = setTimeout(() => fn.apply(this, args), delay);
+            };
+        }
+
+        // Debounced name sync functions (300ms delay)
+        const debouncedSyncPatientName = debounce((name) => {
+            if (typeof syncNameToSupabase === 'function') {
+                syncNameToSupabase('patient', name);
+            }
+        }, 300);
+
+        const debouncedSyncPartnerName = debounce((name) => {
+            if (typeof syncNameToSupabase === 'function') {
+                syncNameToSupabase('partner', name);
+            }
+        }, 300);
+
         // Initialize names
         document.getElementById('patient-name').value = getName(PATIENT_NAME_KEY);
         document.getElementById('partner-name').value = getName(PARTNER_NAME_KEY);
@@ -1719,11 +1744,13 @@
         document.getElementById('patient-name').addEventListener('input', (e) => {
             setName(PATIENT_NAME_KEY, e.target.value);
             updateTabLabels();
+            debouncedSyncPatientName(e.target.value);
         });
 
         document.getElementById('partner-name').addEventListener('input', (e) => {
             setName(PARTNER_NAME_KEY, e.target.value);
             updateTabLabels();
+            debouncedSyncPartnerName(e.target.value);
         });
 
         updateTabLabels();
@@ -2227,26 +2254,29 @@
                         await ensureHousehold();
                     }
 
+                    // Fetch names from Supabase and update localStorage
+                    await fetchNamesFromSupabase();
+                    document.getElementById('patient-name').value = getName(PATIENT_NAME_KEY);
+                    document.getElementById('partner-name').value = getName(PARTNER_NAME_KEY);
+                    updateTabLabels();
+
                     updateAuthUI(session);
 
                     // Set default tab based on role
                     setDefaultTab();
 
-                    // Sync entries from Supabase
+                    // Sync entries from Supabase - remote is source of truth
                     try {
                         const remoteEntries = await fetchEntriesFromSupabase();
+                        // Remote takes full precedence - replace local with remote
                         if (remoteEntries.length > 0) {
-                            // Merge with local (remote takes precedence for now)
-                            const localEntries = getEntries();
-                            const mergedMap = new Map();
-                            localEntries.forEach(e => mergedMap.set(e.id, e));
-                            remoteEntries.forEach(e => mergedMap.set(e.id, e));
-                            const merged = Array.from(mergedMap.values());
-                            merged.sort((a, b) => new Date(b.date) - new Date(a.date));
-                            saveEntries(merged);
-                            renderHistory();
-                            buildEffectList('effect-list', 'patient');
+                            remoteEntries.sort((a, b) => new Date(b.date) - new Date(a.date));
+                            saveEntries(remoteEntries);
                         }
+                        renderHistory();
+                        renderPartnerHistory();
+                        buildEffectList('effect-list', 'patient');
+                        updateCharts();
                     } catch (e) {
                         console.error('Sync error:', e);
                     }
@@ -2272,32 +2302,29 @@
                             await ensureHousehold();
                         }
 
+                        // Fetch names from Supabase and update localStorage
+                        await fetchNamesFromSupabase();
+                        document.getElementById('patient-name').value = getName(PATIENT_NAME_KEY);
+                        document.getElementById('partner-name').value = getName(PARTNER_NAME_KEY);
+                        updateTabLabels();
+
                         updateAuthUI(session); // Update UI again after role is determined
 
                         // Set default tab based on role
                         setDefaultTab();
 
-                        // First fetch remote entries (for new device sync)
+                        // Fetch remote entries - remote is source of truth
                         try {
                             const remoteEntries = await fetchEntriesFromSupabase();
-                            const localEntries = getEntries();
-
-                            // Merge: remote takes precedence
-                            const mergedMap = new Map();
-                            localEntries.forEach(e => mergedMap.set(e.id, e));
-                            remoteEntries.forEach(e => mergedMap.set(e.id, e));
-                            const merged = Array.from(mergedMap.values());
-                            merged.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-                            // Save merged locally (without triggering sync back)
-                            originalSaveEntries(merged);
-                            renderHistory();
-                            buildEffectList('effect-list', 'patient');
-
-                            // Then push any local-only entries to remote
-                            if (localEntries.length > 0) {
-                                await syncEntriesToSupabase(merged);
+                            // Remote takes full precedence - replace local with remote
+                            if (remoteEntries.length > 0) {
+                                remoteEntries.sort((a, b) => new Date(b.date) - new Date(a.date));
+                                originalSaveEntries(remoteEntries);
                             }
+                            renderHistory();
+                            renderPartnerHistory();
+                            buildEffectList('effect-list', 'patient');
+                            updateCharts();
                         } catch (e) {
                             console.error('Sync error:', e);
                         }

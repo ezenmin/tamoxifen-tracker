@@ -50,11 +50,21 @@ Deno.serve(async (req) => {
 
   const token = authHeader.replace("Bearer ", "");
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const serviceRoleKey = Deno.env.get("SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const serviceRoleKey = Deno.env.get("SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+  // Debug: check if env vars are set
+  if (!supabaseUrl || !anonKey) {
+    console.error("Missing env vars:", { supabaseUrl: !!supabaseUrl, anonKey: !!anonKey, serviceRoleKey: !!serviceRoleKey });
+    return new Response(JSON.stringify({ error: "Server configuration error", details: "Missing SUPABASE_URL or SUPABASE_ANON_KEY" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 
   // Create client with user's token to get their identity
-  const supabaseUser = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+  const supabaseUser = createClient(supabaseUrl, anonKey, {
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { persistSession: false },
   });
@@ -63,7 +73,8 @@ Deno.serve(async (req) => {
   const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
 
   if (userError || !user) {
-    return new Response(JSON.stringify({ error: "Invalid token" }), {
+    console.error("Auth error:", userError?.message || "No user returned");
+    return new Response(JSON.stringify({ error: "Invalid token", details: userError?.message || "getUser failed" }), {
       status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
