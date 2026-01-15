@@ -1040,19 +1040,28 @@
                     return;
                 }
 
+                let entryToSync;
                 if (existingIdx >= 0) {
                     // Update existing entry
                     entries[existingIdx].severity = severity;
                     entries[existingIdx].date = selectedDate.toISOString();
+                    entryToSync = entries[existingIdx];
                 } else {
                     // Create new entry
                     const entry = createEntry(type, severity, '');
                     entry.author = 'patient';
                     entry.date = selectedDate.toISOString();
                     entries.unshift(entry);
+                    entryToSync = entry;
                 }
                 entries.sort((a, b) => new Date(b.date) - new Date(a.date));
                 saveEntries(entries);
+                
+                // Sync to Supabase
+                if (typeof saveOrDeleteEntryToSupabase === 'function') {
+                    saveOrDeleteEntryToSupabase(entryToSync).catch(e => console.error('Sync error:', e));
+                }
+                
                 renderHistory();
                 buildEffectList('effect-list', 'patient');
 
@@ -1114,18 +1123,27 @@
                     return;
                 }
 
+                let observationToSync;
                 if (existingIdx >= 0) {
                     // Update existing entry
                     observations[existingIdx].severity = severity;
                     observations[existingIdx].date = selectedDate.toISOString();
+                    observationToSync = observations[existingIdx];
                 } else {
                     // Create new entry
                     const observation = createPartnerObservation(type, severity, '');
                     observation.date = selectedDate.toISOString();
                     observations.unshift(observation);
+                    observationToSync = observation;
                 }
                 observations.sort((a, b) => new Date(b.date) - new Date(a.date));
                 savePartnerObservations(observations);
+                
+                // Sync to Supabase
+                if (typeof saveOrDeleteEntryToSupabase === 'function') {
+                    saveOrDeleteEntryToSupabase(observationToSync).catch(e => console.error('Sync error:', e));
+                }
+                
                 renderPartnerHistory();
                 buildEffectList('partner-effect-list', 'partner');
 
@@ -1160,6 +1178,12 @@
                 entries.unshift(entry);
                 entries.sort((a, b) => new Date(b.date) - new Date(a.date));
                 saveEntries(entries);
+                
+                // Sync to Supabase
+                if (typeof saveOrDeleteEntryToSupabase === 'function') {
+                    saveOrDeleteEntryToSupabase(entry).catch(e => console.error('Sync error:', e));
+                }
+                
                 renderHistory();
 
                 const summaryTab = document.getElementById('tab-summary');
@@ -1195,6 +1219,12 @@
                 entries.unshift(entry);
                 entries.sort((a, b) => new Date(b.date) - new Date(a.date));
                 saveEntries(entries);
+                
+                // Sync to Supabase
+                if (typeof saveOrDeleteEntryToSupabase === 'function') {
+                    saveOrDeleteEntryToSupabase(entry).catch(e => console.error('Sync error:', e));
+                }
+                
                 document.getElementById('weight-value').value = '';
                 renderHistory();
             } catch (e) {
