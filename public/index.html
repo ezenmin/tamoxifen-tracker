@@ -410,6 +410,15 @@
         </div>
     </div>
 
+    <!-- Debug panel (hidden by default, tap header 5x to show) -->
+    <div id="debug-panel" style="display:none; position:fixed; bottom:0; left:0; right:0; max-height:40vh; overflow-y:auto; background:#1a1a1a; color:#0f0; font-family:monospace; font-size:11px; padding:8px; z-index:9999;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+            <span>Debug Log (v15)</span>
+            <button onclick="document.getElementById('debug-panel').style.display='none'" style="background:none;border:none;color:#fff;cursor:pointer;">✕</button>
+        </div>
+        <div id="debug-log"></div>
+    </div>
+
     <main id="main-app">
         <div class="tabs">
             <button class="tab" onclick="showTab('info')">Info</button>
@@ -762,6 +771,28 @@
         // State
         let selectedEffectType = 'hot_flashes';
         let selectedPartnerType = 'noticed_mood_change';
+
+        // Debug logging (tap header 5x to show debug panel)
+        let debugTapCount = 0;
+        let debugTapTimer = null;
+        function debugLog(msg) {
+            const panel = document.getElementById('debug-log');
+            if (panel) {
+                const time = new Date().toLocaleTimeString();
+                panel.innerHTML += `<div>[${time}] ${msg}</div>`;
+                panel.scrollTop = panel.scrollHeight;
+            }
+            console.log('[DEBUG]', msg);
+        }
+        document.querySelector('header').addEventListener('click', () => {
+            debugTapCount++;
+            clearTimeout(debugTapTimer);
+            debugTapTimer = setTimeout(() => { debugTapCount = 0; }, 1500);
+            if (debugTapCount >= 5) {
+                document.getElementById('debug-panel').style.display = 'block';
+                debugTapCount = 0;
+            }
+        });
 
         // Selected dates (for logging/editing historical days)
         function toDateInputValue(d) {
@@ -2301,31 +2332,44 @@
 
             // Normal mode - initialize Supabase
             if (initSupabase()) {
+                debugLog('Supabase initialized');
                 document.getElementById('sync-section').style.display = 'block';
 
                 // Check existing session
                 const session = await getSession();
+                debugLog('Session check: ' + (session ? session.user.email : 'none'));
                 if (session) {
                     currentUser = session.user;
 
                     // Try to claim any pending household invite (for partners)
-                    const claimResult = await claimHouseholdInvite();
+                    try {
+                        const claimResult = await claimHouseholdInvite();
+                        debugLog('Claim result: ' + JSON.stringify(claimResult));
 
-                    if (claimResult.success) {
-                        // Invite claimed - household/role already set
-                        console.log('Invite claimed successfully');
-                    } else {
-                        // No invite (or error treated as no invite) - proceed to ensureHousehold
-                        await ensureHousehold();
+                        if (claimResult.success) {
+                            debugLog('Invite claimed - role: ' + claimResult.role);
+                        } else {
+                            // No invite (or error treated as no invite) - proceed to ensureHousehold
+                            await ensureHousehold();
+                            debugLog('ensureHousehold done - role: ' + getUserRole());
+                        }
+                    } catch (e) {
+                        debugLog('ERROR in claim/ensure: ' + e.message);
                     }
 
                     // Fetch names from Supabase and update localStorage
-                    await fetchNamesFromSupabase();
+                    try {
+                        await fetchNamesFromSupabase();
+                        debugLog('Names fetched');
+                    } catch (e) {
+                        debugLog('ERROR fetching names: ' + e.message);
+                    }
                     document.getElementById('patient-name').value = getName(PATIENT_NAME_KEY);
                     document.getElementById('partner-name').value = getName(PARTNER_NAME_KEY);
                     updateTabLabels();
 
                     updateAuthUI(session);
+                    debugLog('Auth UI updated - role: ' + getUserRole());
 
                     // Set default tab based on role
                     setDefaultTab();
@@ -2360,21 +2404,30 @@
 
                 // Listen for auth changes
                 onAuthStateChange(async (event, session) => {
+                    debugLog('Auth event: ' + event + ', session: ' + (session ? 'yes' : 'no'));
                     updateAuthUI(session);
                     if (session) {
                         // Try to claim any pending household invite (for partners)
-                        const claimResult = await claimHouseholdInvite();
+                        try {
+                            const claimResult = await claimHouseholdInvite();
+                            debugLog('onChange claim: ' + JSON.stringify(claimResult));
 
-                        if (claimResult.success) {
-                            // Invite claimed - household/role already set
-                            console.log('Invite claimed successfully');
-                        } else {
-                            // No invite (or error treated as no invite) - proceed to ensureHousehold
-                            await ensureHousehold();
+                            if (claimResult.success) {
+                                debugLog('onChange invite claimed');
+                            } else {
+                                await ensureHousehold();
+                                debugLog('onChange ensureHousehold done - role: ' + getUserRole());
+                            }
+                        } catch (e) {
+                            debugLog('onChange ERROR: ' + e.message);
                         }
 
                         // Fetch names from Supabase and update localStorage
-                        await fetchNamesFromSupabase();
+                        try {
+                            await fetchNamesFromSupabase();
+                        } catch (e) {
+                            debugLog('onChange names ERROR: ' + e.message);
+                        }
                         document.getElementById('patient-name').value = getName(PATIENT_NAME_KEY);
                         document.getElementById('partner-name').value = getName(PARTNER_NAME_KEY);
                         updateTabLabels();
