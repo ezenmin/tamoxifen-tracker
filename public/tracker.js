@@ -474,8 +474,11 @@ async function saveOrDeleteEntryToSupabase(entry) {
 
     const existing = existingList?.[0];
 
-    // If severity is null/0/empty, DELETE the entry (user unselected)
-    if (!entry.severity || entry.severity === 0) {
+    // Event entries (menstrual, weight, daily notes) don't have severity - always save them
+    const isEventEntry = entry.event === true;
+
+    // If severity is null/0/empty AND it's not an event entry, DELETE (user unselected)
+    if (!isEventEntry && (!entry.severity || entry.severity === 0)) {
         if (existing) {
             // Only delete if we own it or it's legacy (null owner)
             if (!existing.created_by_user_id || existing.created_by_user_id === currentUser.id) {
