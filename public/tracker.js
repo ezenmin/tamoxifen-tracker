@@ -57,11 +57,100 @@ async function signInWithMagicLink(email) {
     return { success: true };
 }
 
+async function verifyEmailOtp(email, token) {
+    if (!supabaseClient) throw new Error('Supabase not initialized');
+    const cleanedToken = String(token || '').trim().replace(/\s+/g, '');
+    if (!email) throw new Error('Email is required');
+    if (!cleanedToken) throw new Error('Code is required');
+
+    // Supabase supports multiple OTP “types” depending on configuration.
+    // Try the common one first, then fall back.
+    const attempts = [
+        { type: 'email', label: 'email' },
+        { type: 'magiclink', label: 'magiclink' }
+    ];
+
+    let lastError = null;
+    for (const attempt of attempts) {
+        // verifyOtp throws in some environments; normalize to { data, error }
+        // eslint-disable-next-line no-await-in-loop
+        const result = await supabaseClient.auth.verifyOtp({
+            email,
+            token: cleanedToken,
+            type: attempt.type
+        }).catch((e) => ({ error: e }));
+
+        const error = result?.error;
+        if (!error) {
+            return { success: true, session: result?.data?.session || null };
+        }
+        lastError = error;
+    }
+
+    const message = lastError?.message || String(lastError || 'Invalid code');
+    throw new Error(message);
+}
+
 async function signOut() {
     if (!supabaseClient) return;
     await supabaseClient.auth.signOut();
     currentUser = null;
     currentHouseholdId = null;
+}
+
+// =============================================================================
+// CODE-BASED AUTH (PWA-friendly, no redirect required)
+// =============================================================================
+
+async function requestLoginCode(email) {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/request-login-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+        throw new Error(data.error || 'Failed to request code');
+    }
+    return data;
+}
+
+async function verifyLoginCode(email, code) {
+    if (!supabaseClient) throw new Error('Supabase not initialized');
+
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/verify-login-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+        throw new Error(data.error || 'Invalid code');
+    }
+
+    // If we got session tokens directly, set them
+    if (data.access_token && data.refresh_token) {
+        const { error } = await supabaseClient.auth.setSession({
+            access_token: data.access_token,
+            refresh_token: data.refresh_token
+        });
+        if (error) throw error;
+        return { success: true };
+    }
+
+    // If we got a token for verifyOtp, use that
+    if (data.token) {
+        const verifyType = data.type === 'token_hash' ? 'magiclink' : 'email';
+        const { error } = await supabaseClient.auth.verifyOtp({
+            email,
+            token: data.token,
+            type: verifyType
+        });
+        if (error) throw error;
+        return { success: true };
+    }
+
+    throw new Error('Unexpected response from server');
 }
 
 async function getSession() {
