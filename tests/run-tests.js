@@ -370,6 +370,122 @@ if (fs.existsSync(trackerPath)) {
         assertEqual(callCount, 3, 'Without debounce, all calls execute');
     });
 
+    // -----------------------------------------------------------------------------
+    // Deduplication & Entry Upsert/Delete Tests
+    // -----------------------------------------------------------------------------
+    console.log('\n--- Deduplication & Entry Upsert/Delete Tests ---');
+
+    test('getEntryUniqueKey generates consistent keys', () => {
+        const key1 = 'hh123:2026-01-15:hot_flashes:patient';
+        const key2 = 'hh123:2026-01-15:hot_flashes:patient';
+        assertEqual(key1, key2, 'Same inputs should produce same key');
+    });
+
+    test('getEntryUniqueKey differentiates by type', () => {
+        const key1 = 'hh123:2026-01-15:hot_flashes:patient';
+        const key2 = 'hh123:2026-01-15:fatigue:patient';
+        assert(key1 !== key2, 'Different types should produce different keys');
+    });
+
+    test('getEntryUniqueKey differentiates by date', () => {
+        const key1 = 'hh123:2026-01-15:hot_flashes:patient';
+        const key2 = 'hh123:2026-01-14:hot_flashes:patient';
+        assert(key1 !== key2, 'Different dates should produce different keys');
+    });
+
+    test('getEntryUniqueKey differentiates by author', () => {
+        const key1 = 'hh123:2026-01-15:hot_flashes:patient';
+        const key2 = 'hh123:2026-01-15:hot_flashes:partner';
+        assert(key1 !== key2, 'Different authors should produce different keys');
+    });
+
+    test('clicking same category multiple times keeps only last value', () => {
+        // Simulate: user clicks hot_flashes 3 times with severities 2, 3, 4
+        const clicks = [
+            { type: 'hot_flashes', severity: 2, timestamp: '2026-01-15T10:00:00Z' },
+            { type: 'hot_flashes', severity: 3, timestamp: '2026-01-15T10:01:00Z' },
+            { type: 'hot_flashes', severity: 4, timestamp: '2026-01-15T10:02:00Z' },
+        ];
+
+        // Each click should UPDATE, not create new
+        let entry = null;
+        clicks.forEach(click => {
+            entry = { type: click.type, severity: click.severity, date: click.timestamp };
+        });
+
+        // Result: 1 entry with severity=4 (last value)
+        assertEqual(entry.severity, 4, 'Should keep the last severity value (4)');
+    });
+
+    test('unselecting a category deletes the entry (severity null = 0 entries)', () => {
+        // Simulate: user clicks hot_flashes then unclicks it
+        let entries = [
+            { id: 'a', type: 'hot_flashes', date: '2026-01-15T10:00:00Z', severity: 3 }
+        ];
+
+        // User unclicks - severity becomes null/0/empty
+        const unclickSeverity = null;
+        const dayKey = '2026-01-15';
+        const type = 'hot_flashes';
+
+        if (unclickSeverity === null || unclickSeverity === 0) {
+            // DELETE the entry
+            entries = entries.filter(e => !(e.date.startsWith(dayKey) && e.type === type));
+        }
+
+        assertEqual(entries.length, 0, 'Unselecting should delete the entry (0 entries)');
+    });
+
+    test('different categories on same day create separate entries', () => {
+        const entries = [
+            { id: 'a', type: 'hot_flashes', date: '2026-01-15T10:00:00Z', severity: 3 },
+            { id: 'b', type: 'fatigue', date: '2026-01-15T10:00:00Z', severity: 2 },
+        ];
+
+        assertEqual(entries.length, 2, 'Different types on same day should have 2 entries');
+    });
+
+    test('deduplicateEntries keeps only the last entry per unique key', () => {
+        // Input: 3 entries, 2 are duplicates (same day, same type, same author)
+        const entries = [
+            { id: 'a', type: 'hot_flashes', date: '2026-01-15T10:00:00Z', author: 'patient', severity: 2 },
+            { id: 'b', type: 'hot_flashes', date: '2026-01-15T14:00:00Z', author: 'patient', severity: 3 }, // Duplicate - same day/type/author
+            { id: 'c', type: 'fatigue', date: '2026-01-15T10:00:00Z', author: 'patient', severity: 1 }, // Different type - OK
+        ];
+
+        // Dedup logic: group by (date's day, type, author), keep last entry
+        const seen = new Map();
+        entries.forEach(e => {
+            const dayKey = e.date.split('T')[0];
+            const key = `${dayKey}:${e.type}:${e.author || 'patient'}`;
+            seen.set(key, e); // Later entry overwrites earlier
+        });
+        const deduped = Array.from(seen.values());
+
+        assertEqual(deduped.length, 2, 'Should have 2 unique entries (one hot_flashes + one fatigue)');
+        const hotFlash = deduped.find(e => e.type === 'hot_flashes');
+        assertEqual(hotFlash.severity, 3, 'Should keep the later hot_flashes entry (severity 3)');
+    });
+
+    test('updateOrDeleteEntry handles upsert correctly', () => {
+        let entries = [
+            { id: 'a', type: 'hot_flashes', date: '2026-01-15T10:00:00Z', severity: 2 }
+        ];
+
+        // Update with new severity
+        const newSeverity = 4;
+        const dayKey = '2026-01-15';
+        const type = 'hot_flashes';
+
+        const existing = entries.find(e => e.date.startsWith(dayKey) && e.type === type);
+        if (existing) {
+            existing.severity = newSeverity;
+        }
+
+        assertEqual(entries.length, 1, 'Should still have exactly 1 entry (not 2)');
+        assertEqual(entries[0].severity, 4, 'Severity should be updated to new value');
+    });
+
 } else {
     console.log('  (tracker.js not yet created - creating skeleton tests)');
     

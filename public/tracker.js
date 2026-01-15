@@ -450,46 +450,90 @@ async function fetchNamesFromSupabase() {
 // SYNC FUNCTIONS
 // =============================================================================
 
+/**
+ * Save or delete a single entry to Supabase using upsert logic.
+ * Uses (occurred_at, type, author) as the unique key - NOT the entry's internal ID.
+ * If severity is null/0/empty, DELETE the entry.
+ * Otherwise, UPSERT (update existing or insert new).
+ */
+async function saveOrDeleteEntryToSupabase(entry) {
+    if (!supabaseClient || !currentHouseholdId || !currentUser) return;
+
+    const occurredAt = entry.date ? entry.date.split('T')[0] : new Date().toISOString().split('T')[0];
+    const entryType = entry.type;
+    const author = entry.author || 'patient';
+
+    // Find existing entry by (occurred_at, type, author) - the TRUE unique key
+    const { data: existingList } = await supabaseClient
+        .from('entries')
+        .select('id, created_by_user_id')
+        .eq('household_id', currentHouseholdId)
+        .eq('occurred_at', occurredAt)
+        .filter('payload->>type', 'eq', entryType)
+        .filter('payload->>author', 'eq', author);
+
+    const existing = existingList?.[0];
+
+    // If severity is null/0/empty, DELETE the entry (user unselected)
+    if (!entry.severity || entry.severity === 0) {
+        if (existing) {
+            // Only delete if we own it or it's legacy (null owner)
+            if (!existing.created_by_user_id || existing.created_by_user_id === currentUser.id) {
+                await supabaseClient
+                    .from('entries')
+                    .delete()
+                    .eq('id', existing.id);
+                console.log(`Deleted entry for ${entryType} on ${occurredAt}`);
+            }
+        }
+        return;
+    }
+
+    // Otherwise, UPSERT (update existing or insert new)
+    const payloadWithOwner = { ...entry, _created_by_user_id: currentUser.id };
+
+    if (existing) {
+        // Only update if we own it or it's legacy (null owner)
+        if (!existing.created_by_user_id || existing.created_by_user_id === currentUser.id) {
+            await supabaseClient
+                .from('entries')
+                .update({
+                    payload: payloadWithOwner,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', existing.id);
+            console.log(`Updated entry for ${entryType} on ${occurredAt} to severity ${entry.severity}`);
+        }
+    } else {
+        // Insert new entry
+        await supabaseClient
+            .from('entries')
+            .insert({
+                household_id: currentHouseholdId,
+                occurred_at: occurredAt,
+                payload: payloadWithOwner,
+                created_by_user_id: currentUser.id
+            });
+        console.log(`Created entry for ${entryType} on ${occurredAt} with severity ${entry.severity}`);
+    }
+}
+
 async function syncEntriesToSupabase(localEntries) {
     if (!supabaseClient || !currentHouseholdId || !currentUser) return;
 
-    // Get remote entries
-    const { data: remoteEntries, error } = await supabaseClient
-        .from('entries')
-        .select('id, payload, created_by_user_id')
-        .eq('household_id', currentHouseholdId);
-
-    if (error) throw error;
-
-    // Upsert local entries that don't exist remotely or need updating
+    // Deduplicate local entries first: keep only last entry per (day, type, author)
+    const dedupMap = new Map();
     for (const entry of localEntries) {
-        const occurredAt = entry.date ? entry.date.split('T')[0] : new Date().toISOString().split('T')[0];
+        const dayKey = (entry.date || '').split('T')[0];
+        const author = entry.author || 'patient';
+        const uniqueKey = `${dayKey}:${entry.type}:${author}`;
+        dedupMap.set(uniqueKey, entry); // Later entry overwrites earlier
+    }
+    const dedupedEntries = Array.from(dedupMap.values());
 
-        // Check if entry exists by payload.id
-        const existingRemote = (remoteEntries || []).find(r => r.payload?.id === entry.id);
-
-        if (existingRemote) {
-            // Only update if this user owns the entry (created_by_user_id matches)
-            // If created_by_user_id is null (legacy), allow update by anyone in household
-            if (existingRemote.created_by_user_id && existingRemote.created_by_user_id !== currentUser.id) {
-                // Skip - can't update other user's entries
-                continue;
-            }
-            await supabaseClient
-                .from('entries')
-                .update({ payload: entry, occurred_at: occurredAt })
-                .eq('id', existingRemote.id);
-        } else {
-            // Insert new - set created_by_user_id to current user
-            await supabaseClient
-                .from('entries')
-                .insert({
-                    household_id: currentHouseholdId,
-                    occurred_at: occurredAt,
-                    payload: entry,
-                    created_by_user_id: currentUser.id
-                });
-        }
+    // Sync each deduplicated entry using upsert logic
+    for (const entry of dedupedEntries) {
+        await saveOrDeleteEntryToSupabase(entry);
     }
 }
 
@@ -1137,6 +1181,7 @@ if (typeof module !== 'undefined' && module.exports) {
         getPendingInvites: typeof getPendingInvites !== 'undefined' ? getPendingInvites : async () => [],
         revokeInvite: typeof revokeInvite !== 'undefined' ? revokeInvite : async () => false,
         syncNameToSupabase: typeof syncNameToSupabase !== 'undefined' ? syncNameToSupabase : async () => {},
-        fetchNamesFromSupabase: typeof fetchNamesFromSupabase !== 'undefined' ? fetchNamesFromSupabase : async () => {}
+        fetchNamesFromSupabase: typeof fetchNamesFromSupabase !== 'undefined' ? fetchNamesFromSupabase : async () => {},
+        saveOrDeleteEntryToSupabase: typeof saveOrDeleteEntryToSupabase !== 'undefined' ? saveOrDeleteEntryToSupabase : async () => {}
     };
 }
