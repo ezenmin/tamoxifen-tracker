@@ -503,6 +503,9 @@ async function fetchNamesFromSupabase() {
 // SYNC FUNCTIONS
 // =============================================================================
 
+// Lock to prevent concurrent saveOrDeleteEntryToSupabase for same key
+const syncLocks = new Map();
+
 /**
  * Save or delete a single entry to Supabase using upsert logic.
  * Uses (occurred_at, type, author) as the unique key - NOT the entry's internal ID.
@@ -515,6 +518,21 @@ async function saveOrDeleteEntryToSupabase(entry) {
     const occurredAt = entry.date ? entry.date.split('T')[0] : new Date().toISOString().split('T')[0];
     const entryType = entry.type;
     const author = entry.author || 'patient';
+    
+    // Use a lock to prevent concurrent operations on the same key
+    const lockKey = `${occurredAt}:${entryType}:${author}`;
+    
+    // Wait for any pending operation on this key
+    while (syncLocks.has(lockKey)) {
+        await syncLocks.get(lockKey);
+    }
+    
+    // Create a new lock promise
+    let releaseLock;
+    const lockPromise = new Promise(resolve => { releaseLock = resolve; });
+    syncLocks.set(lockKey, lockPromise);
+    
+    try {
 
     // Find existing entry by (occurred_at, type, author) - the TRUE unique key
     // For patient entries, also match entries where author is null (legacy entries)
@@ -590,6 +608,12 @@ async function saveOrDeleteEntryToSupabase(entry) {
                 created_by_user_id: currentUser.id
             });
         console.log(`Created entry for ${entryType} on ${occurredAt} with severity ${entry.severity}`);
+    }
+    
+    } finally {
+        // Release lock
+        syncLocks.delete(lockKey);
+        releaseLock();
     }
 }
 

@@ -2298,6 +2298,16 @@
                     exercises = exercises.filter(e => new Date(e.date) >= startDate);
                 }
 
+                // Deduplicate: keep only the latest entry per date
+                const byDate = {};
+                for (const e of exercises) {
+                    const dateKey = e.date?.split('T')[0] || 'Unknown';
+                    if (!byDate[dateKey] || new Date(e.date) > new Date(byDate[dateKey].date)) {
+                        byDate[dateKey] = e;
+                    }
+                }
+                exercises = Object.values(byDate);
+
                 if (exercises.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;color:#666;">No exercise entries found for this period</td></tr>';
                     output.style.display = 'block';
