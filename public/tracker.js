@@ -735,8 +735,7 @@ async function fetchDoctorSummary(token) {
     const functionUrl = `${SUPABASE_URL}/functions/v1/doctor-summary?share=${encodeURIComponent(token)}`;
     const response = await fetch(functionUrl, {
         headers: {
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-            'apikey': SUPABASE_ANON_KEY
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
         }
     });
     if (!response.ok) {
