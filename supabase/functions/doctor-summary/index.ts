@@ -154,9 +154,13 @@ Deno.serve(async (req) => {
     if (typeof payload.severity === "number") {
       sanitizedEntry.severity = payload.severity;
     }
-    // Include message for exercise and day_note types (doctor needs full context)
-    if ((payload.type === 'exercise' || payload.type === 'day_note') && typeof payload.message === "string") {
-      sanitizedEntry.message = payload.message;
+    // Include notes for exercise and daily_note types (doctor needs full context)
+    if ((payload.type === 'exercise' || payload.type === 'daily_note') && typeof payload.notes === "string") {
+      sanitizedEntry.notes = payload.notes;
+    }
+    // Also mark event entries
+    if (payload.event === true) {
+      sanitizedEntry.event = true;
     }
     rawEntries.push(sanitizedEntry);
   }
