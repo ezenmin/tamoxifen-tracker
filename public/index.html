@@ -1113,12 +1113,9 @@
                 }
                 entries.sort((a, b) => new Date(b.date) - new Date(a.date));
                 saveEntries(entries);
-                
-                // Sync to Supabase
-                if (typeof saveOrDeleteEntryToSupabase === 'function') {
-                    saveOrDeleteEntryToSupabase(entryToSync).catch(e => console.error('Sync error:', e));
-                }
-                
+                // Note: saveEntries already triggers syncEntriesToSupabase via the override
+                // Do NOT call saveOrDeleteEntryToSupabase here - it causes duplicates!
+
                 renderHistory();
                 buildEffectList('effect-list', 'patient');
 
