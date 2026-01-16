@@ -145,7 +145,7 @@ Deno.serve(async (req) => {
       symptomCounts[symptom] = (symptomCounts[symptom] || 0) + 1;
     }
 
-    // Add to raw entries for charts (sanitize: keep date, type, severity, author; redact notes/messages)
+    // Add to raw entries for charts
     const sanitizedEntry: Record<string, unknown> = {
       date: payload.date || date,
       type: payload.type,
@@ -154,8 +154,8 @@ Deno.serve(async (req) => {
     if (typeof payload.severity === "number") {
       sanitizedEntry.severity = payload.severity;
     }
-    // Include exercise text but redact day_note messages for privacy
-    if (payload.type === 'exercise' && typeof payload.message === "string") {
+    // Include message for exercise and day_note types (doctor needs full context)
+    if ((payload.type === 'exercise' || payload.type === 'day_note') && typeof payload.message === "string") {
       sanitizedEntry.message = payload.message;
     }
     rawEntries.push(sanitizedEntry);
