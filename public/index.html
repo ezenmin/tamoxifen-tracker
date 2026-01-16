@@ -421,10 +421,10 @@
 
     <main id="main-app">
         <div class="tabs">
-            <button class="tab" onclick="showTab('info')">Info</button>
-            <button class="tab active" onclick="showTab('log')"><span id="tab-log-label">Log</span></button>
-            <button class="tab" onclick="showTab('partner')"><span id="tab-partner-label">Partner</span></button>
-            <button class="tab" onclick="showTab('summary')">Summary</button>
+            <button class="tab" id="tab-info-btn" onclick="showTab('info')">Info</button>
+            <button class="tab active" id="tab-log-btn" onclick="showTab('log')"><span id="tab-log-label">Log</span></button>
+            <button class="tab" id="tab-partner-btn" onclick="showTab('partner')"><span id="tab-partner-label">Partner</span></button>
+            <button class="tab" id="tab-summary-btn" onclick="showTab('summary')">Summary</button>
             <button class="tab" id="tab-manage-btn" onclick="showTab('manage')" style="display:none;">Manage</button>
         </div>
 
@@ -2538,16 +2538,46 @@
             // Check for share mode first
             const shareToken = checkShareMode();
             if (shareToken) {
-                // Hide main app, show share view
-                document.getElementById('main-app').style.display = 'none';
+                // Share mode: Show main app but hide logging tabs, show only Info + Summary
                 document.getElementById('sync-section').style.display = 'none';
-                document.getElementById('share-mode-view').style.display = 'block';
+                document.getElementById('share-mode-view').style.display = 'none';
+                
+                // Hide Log, Partner, Manage tabs
+                document.getElementById('tab-log-btn').style.display = 'none';
+                document.getElementById('tab-partner-btn').style.display = 'none';
+                document.getElementById('tab-manage-btn').style.display = 'none';
+                
+                // Hide doctor share section in Summary (doctor doesn't need to share again)
+                document.getElementById('doctor-share-section').style.display = 'none';
+
+                // Add a banner showing this is read-only
+                const banner = document.createElement('div');
+                banner.className = 'card';
+                banner.style.cssText = 'background:#fef3c7;border:1px solid #f59e0b;margin-bottom:1rem;';
+                banner.innerHTML = '<p style="margin:0;"><strong>📋 Doctor View (Read Only)</strong> — This is a shared summary. Link expires in 7 days.</p>';
+                document.getElementById('main-app').insertBefore(banner, document.getElementById('main-app').firstChild);
 
                 try {
                     const summary = await fetchDoctorSummary(shareToken);
-                    renderShareSummary(summary);
+                    if (summary.error) {
+                        alert('Error: ' + summary.error);
+                        return;
+                    }
+                    
+                    // Load entries from share response into localStorage for charts
+                    const entries = summary.entries || [];
+                    const patientEntries = entries.filter(e => (e.author || 'patient') === 'patient');
+                    const partnerEntries = entries.filter(e => e.author === 'partner');
+                    
+                    // Save to localStorage so charts can render
+                    saveEntries(patientEntries);
+                    savePartnerObservations(partnerEntries);
+                    
+                    // Show Summary tab by default, update charts
+                    showTab('summary');
+                    updateCharts();
                 } catch (e) {
-                    renderShareSummary({ error: e.message });
+                    alert('Failed to load summary: ' + e.message);
                 }
                 return;
             }

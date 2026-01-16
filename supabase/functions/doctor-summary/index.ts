@@ -117,11 +117,14 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Build summary (no raw notes or free text)
+  // Build summary stats
   const severityCounts: Record<string, number> = {};
   const symptomCounts: Record<string, number> = {};
   let minDate: string | null = null;
   let maxDate: string | null = null;
+
+  // Also build raw entries array for charts (filter out private notes content)
+  const rawEntries: Array<Record<string, unknown>> = [];
 
   for (const entry of entries || []) {
     const date = entry.occurred_at;
@@ -141,6 +144,21 @@ Deno.serve(async (req) => {
       const symptom = payload.type;
       symptomCounts[symptom] = (symptomCounts[symptom] || 0) + 1;
     }
+
+    // Add to raw entries for charts (sanitize: keep date, type, severity, author; redact notes/messages)
+    const sanitizedEntry: Record<string, unknown> = {
+      date: payload.date || date,
+      type: payload.type,
+      author: payload.author || 'patient',
+    };
+    if (typeof payload.severity === "number") {
+      sanitizedEntry.severity = payload.severity;
+    }
+    // Include exercise text but redact day_note messages for privacy
+    if (payload.type === 'exercise' && typeof payload.message === "string") {
+      sanitizedEntry.message = payload.message;
+    }
+    rawEntries.push(sanitizedEntry);
   }
 
   // Sort symptoms by count descending
@@ -157,6 +175,7 @@ Deno.serve(async (req) => {
     total_entries: entries?.length || 0,
     severity_counts: severityCounts,
     top_symptoms: topSymptoms,
+    entries: rawEntries, // Raw entries for interactive charts
     generated_at: new Date().toISOString(),
   };
 
