@@ -465,6 +465,15 @@
                         </div>
                         <div class="helper" style="margin-top:0.25rem;">A free-text note for the selected date.</div>
                     </div>
+
+                    <div class="exercise-section" style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid #eee;">
+                        <label>Exercise (patient)</label>
+                        <div style="display:flex;gap:0.5rem;">
+                            <input id="patient-exercise" class="inline-input" style="flex:1;" placeholder="e.g., 30 min walk, yoga" />
+                            <button class="inline-btn" onclick="saveExercise()">Save</button>
+                        </div>
+                        <div class="helper" style="margin-top:0.25rem;">Track your daily exercise.</div>
+                    </div>
                 </div>
 
                 <div class="card history-col">
@@ -593,6 +602,23 @@
                                 <th>Date</th>
                                 <th>Patient Note</th>
                                 <th>Partner Note</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Exercise Log</h2>
+                <p class="helper" style="margin-top:0;">Patient exercise entries for selected time period.</p>
+                <button class="primary" onclick="showExerciseListing()">Show Exercise</button>
+                <div id="exercise-listing-output" style="display:none;margin-top:1rem;overflow-x:auto;">
+                    <table class="history-table" id="exercise-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Exercise</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -2182,6 +2208,113 @@
                 output.style.display = 'block';
             } catch (e) {
                 tbody.innerHTML = `<tr><td colspan="3" style="color:#dc2626;">Error: ${e.message}</td></tr>`;
+                output.style.display = 'block';
+            }
+        }
+
+        async function saveExercise() {
+            const input = document.getElementById('patient-exercise');
+            const exerciseText = input?.value?.trim();
+
+            if (!exerciseText) {
+                alert('Please enter exercise description first');
+                return;
+            }
+
+            const role = getUserRole();
+            if (role !== 'patient') {
+                alert('Only patient can log exercise');
+                return;
+            }
+
+            try {
+                const selectedDate = getSelectedLogDate('patient');
+                const todayStart = startOfDay(selectedDate);
+                const todayEnd = endOfDay(selectedDate);
+
+                const entries = getEntries();
+                let entryToSync;
+
+                const existingIdx = entries.findIndex(e =>
+                    e.type === 'exercise' &&
+                    (e.author || 'patient') === 'patient' &&
+                    new Date(e.date) >= todayStart &&
+                    new Date(e.date) <= todayEnd
+                );
+
+                if (existingIdx >= 0) {
+                    // Update existing exercise entry
+                    entries[existingIdx].notes = exerciseText;
+                    entries[existingIdx].date = selectedDate.toISOString();
+                    entryToSync = entries[existingIdx];
+                } else {
+                    // Create new exercise entry
+                    const entry = {
+                        id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+                        type: 'exercise',
+                        event: true,
+                        author: 'patient',
+                        notes: exerciseText,
+                        date: selectedDate.toISOString()
+                    };
+                    entries.unshift(entry);
+                    entryToSync = entry;
+                }
+
+                entries.sort((a, b) => new Date(b.date) - new Date(a.date));
+                saveEntries(entries);
+
+                // Sync to Supabase
+                if (typeof saveOrDeleteEntryToSupabase === 'function') {
+                    saveOrDeleteEntryToSupabase(entryToSync).catch(e => console.error('Sync error:', e));
+                }
+
+                input.value = '';
+                alert('Exercise saved!');
+                renderHistory();
+            } catch (e) {
+                alert('Error saving exercise: ' + e.message);
+            }
+        }
+
+        async function showExerciseListing() {
+            const output = document.getElementById('exercise-listing-output');
+            const tbody = document.querySelector('#exercise-table tbody');
+            if (!output || !tbody) return;
+
+            try {
+                const days = document.getElementById('date-range').value;
+                const now = new Date();
+                let startDate = null;
+                if (days !== 'all') {
+                    startDate = new Date(now);
+                    startDate.setDate(startDate.getDate() - parseInt(days));
+                }
+
+                let exercises = (getEntries() || [])
+                    .filter(e => e.type === 'exercise' && e.notes);
+
+                if (startDate) {
+                    exercises = exercises.filter(e => new Date(e.date) >= startDate);
+                }
+
+                if (exercises.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;color:#666;">No exercise entries found for this period</td></tr>';
+                    output.style.display = 'block';
+                    return;
+                }
+
+                // Sort by date descending
+                exercises.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                tbody.innerHTML = exercises.map(e => {
+                    const date = e.date?.split('T')[0] || 'Unknown';
+                    return `<tr><td>${date}</td><td>${e.notes}</td></tr>`;
+                }).join('');
+
+                output.style.display = 'block';
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="2" style="color:#dc2626;">Error: ${e.message}</td></tr>`;
                 output.style.display = 'block';
             }
         }

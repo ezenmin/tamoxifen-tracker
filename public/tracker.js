@@ -517,13 +517,32 @@ async function saveOrDeleteEntryToSupabase(entry) {
     const author = entry.author || 'patient';
 
     // Find existing entry by (occurred_at, type, author) - the TRUE unique key
-    const { data: existingList } = await supabaseClient
-        .from('entries')
-        .select('id, created_by_user_id')
-        .eq('household_id', currentHouseholdId)
-        .eq('occurred_at', occurredAt)
-        .filter('payload->>type', 'eq', entryType)
-        .filter('payload->>author', 'eq', author);
+    // For patient entries, also match entries where author is null (legacy entries)
+    let existingList;
+    try {
+        const query = supabaseClient
+            .from('entries')
+            .select('id, created_by_user_id, payload')
+            .eq('household_id', currentHouseholdId)
+            .eq('occurred_at', occurredAt)
+            .filter('payload->>type', 'eq', entryType);
+
+        // Handle author matching - for patient, also match null/missing author
+        if (author === 'patient') {
+            // Get all entries for this type/date, then filter client-side
+            const { data } = await query;
+            existingList = (data || []).filter(row => {
+                const rowAuthor = row.payload?.author;
+                return rowAuthor === 'patient' || rowAuthor === null || rowAuthor === undefined;
+            });
+        } else {
+            const { data } = await query.filter('payload->>author', 'eq', author);
+            existingList = data || [];
+        }
+    } catch (err) {
+        console.error('Error finding existing entry:', err);
+        existingList = [];
+    }
 
     const existing = existingList?.[0];
 

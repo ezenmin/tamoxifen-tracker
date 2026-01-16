@@ -42,6 +42,11 @@ For any task:
 npm test
 ```
 
+### Feature-specific tests (run before committing feature changes)
+```powershell
+node tests/test-exercise-and-notes.js
+```
+
 ### Dev server
 ```powershell
 npm run dev
