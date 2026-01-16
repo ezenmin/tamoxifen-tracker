@@ -733,7 +733,12 @@ async function createDoctorShareLink() {
 
 async function fetchDoctorSummary(token) {
     const functionUrl = `${SUPABASE_URL}/functions/v1/doctor-summary?share=${encodeURIComponent(token)}`;
-    const response = await fetch(functionUrl);
+    const response = await fetch(functionUrl, {
+        headers: {
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'apikey': SUPABASE_ANON_KEY
+        }
+    });
     if (!response.ok) {
         const err = await response.json().catch(() => ({ error: 'Request failed' }));
         throw new Error(err.error || 'Failed to fetch summary');

@@ -1055,14 +1055,13 @@
             const dot = evt && evt.target;
             if (dot && dot.classList.contains('logging')) return; // Prevent double-click
 
-            // Only patient can log in patient tab
+            // Only patient (or unsigned users working locally) can log in patient tab
             const role = getUserRole();
-            if (role !== 'patient') {
-                alert(role === 'partner'
-                    ? 'Only the patient can log entries here. Partners use the Partner tab.'
-                    : 'Please sign in first.');
+            if (role === 'partner') {
+                alert('Only the patient can log entries here. Partners use the Partner tab.');
                 return;
             }
+            // Allow unsigned users to work locally (role will be null/undefined)
 
             try {
                 if (dot) dot.classList.add('logging');

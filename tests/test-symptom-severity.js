@@ -1,16 +1,23 @@
 /**
  * Test cases for symptom severity entry uniqueness
- * Run with: node tests/test-symptom-severity.js
+ * Run with: SUPABASE_SERVICE_KEY=xxx SUPABASE_TEST_HOUSEHOLD_ID=xxx node tests/test-symptom-severity.js
  * 
  * Tests that each symptom type has ONLY ONE entry per day per author
+ * Environment variables: SUPABASE_SERVICE_KEY, SUPABASE_TEST_HOUSEHOLD_ID
  */
 
 const https = require('https');
 
 const SUPABASE_URL = 'https://mhloxubuifluwvnlrklb.supabase.co';
-const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1obG94dWJ1aWZsdXd2bmxya2xiIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2ODQyMTU0OCwiZXhwIjoyMDgzOTk3NTQ4fQ.SYx7qvjBlOGvSoYWPEgfUUqiNrP1eOL6ewqdp4hHb48';
-const HOUSEHOLD_ID = 'f3c49aa8-442d-446c-a6ba-a81b887a0cd3';
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+const HOUSEHOLD_ID = process.env.SUPABASE_TEST_HOUSEHOLD_ID;
 const TEST_DATE = '2099-12-30'; // Use far future date to avoid conflicts
+
+if (!SERVICE_KEY || !HOUSEHOLD_ID) {
+    console.error('ERROR: Required environment variables not set.');
+    console.error('Set SUPABASE_SERVICE_KEY and SUPABASE_TEST_HOUSEHOLD_ID');
+    process.exit(1);
+}
 
 // Helper to make Supabase REST API calls
 function supabaseRequest(method, path, body = null) {
