@@ -1882,12 +1882,12 @@
                 urlParams.delete('refresh');
                 const newUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
                 window.location.replace(newUrl);
-                return;
+                // Note: page will reload, no further code executes
+            } else {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('SW registered:', reg.scope))
+                    .catch(err => console.error('SW registration failed:', err));
             }
-            
-            navigator.serviceWorker.register('./sw.js')
-                .then(reg => console.log('SW registered:', reg.scope))
-                .catch(err => console.error('SW registration failed:', err));
         }
 
         // =============================================================================
