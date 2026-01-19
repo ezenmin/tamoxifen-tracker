@@ -1865,8 +1865,26 @@
         renderHistory();
         renderPartnerHistory();
 
-        // Register service worker
+        // Register service worker (with force-update support)
         if ('serviceWorker' in navigator) {
+            // Check for force refresh parameter
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.has('clearcache') || urlParams.has('refresh')) {
+                // Unregister all service workers and clear caches
+                navigator.serviceWorker.getRegistrations().then(registrations => {
+                    registrations.forEach(reg => reg.unregister());
+                });
+                caches.keys().then(names => {
+                    names.forEach(name => caches.delete(name));
+                });
+                // Remove the parameter and reload
+                urlParams.delete('clearcache');
+                urlParams.delete('refresh');
+                const newUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
+                window.location.replace(newUrl);
+                return;
+            }
+            
             navigator.serviceWorker.register('./sw.js')
                 .then(reg => console.log('SW registered:', reg.scope))
                 .catch(err => console.error('SW registration failed:', err));
@@ -2610,6 +2628,9 @@
                 } else {
                     debugLog('No existing session');
                     updateAuthUI(null);
+                    // For non-authenticated users, still show Log tab and render UI
+                    setDefaultTab();
+                    renderHistory();
                 }
 
                 // Listen for auth changes with protection against race conditions

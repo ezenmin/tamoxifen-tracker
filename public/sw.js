@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tamoxifen-tracker-v23';
+const CACHE_NAME = 'tamoxifen-tracker-v24';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

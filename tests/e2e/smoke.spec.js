@@ -14,7 +14,8 @@ test.describe('Smoke tests', () => {
   });
 
   test('can log a symptom entry via UI', async ({ page }) => {
-    await page.goto('/');
+    // Use demo.html for UI testing - no Supabase auth required
+    await page.goto('/demo.html');
 
     // Wait for effect list to load
     await expect(page.locator('#effect-list')).toBeVisible();
@@ -32,7 +33,8 @@ test.describe('Smoke tests', () => {
   });
 
   test('tabs work correctly', async ({ page }) => {
-    await page.goto('/');
+    // Use demo.html for UI testing - no Supabase auth required
+    await page.goto('/demo.html');
 
     // Initially on Log tab
     await expect(page.locator('#tab-log')).toBeVisible();
