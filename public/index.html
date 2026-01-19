@@ -2517,26 +2517,63 @@
             // Set default tab based on role
             setDefaultTab();
 
-            // Fetch remote entries - remote is source of truth
+            // Fetch remote entries and MERGE with local (don't replace!)
+            // This prevents data loss when sync hasn't completed yet
             try {
                 const remoteEntries = await fetchEntriesFromSupabase();
-                debugLog(`${eventSource} fetched ${remoteEntries.length} entries`);
-                // Split by author and save to appropriate localStorage
-                if (remoteEntries.length > 0) {
-                    const patientEntries = remoteEntries.filter(e => (e.author || 'patient') === 'patient');
-                    const partnerEntries = remoteEntries.filter(e => e.author === 'partner');
+                debugLog(`${eventSource} fetched ${remoteEntries.length} remote entries`);
 
-                    patientEntries.sort((a, b) => new Date(b.date) - new Date(a.date));
-                    partnerEntries.sort((a, b) => new Date(b.date) - new Date(a.date));
+                // Get current local entries BEFORE overwriting
+                const localPatient = getEntries();
+                const localPartner = getPartnerObservations();
+                debugLog(`${eventSource} local entries: ${localPatient.length} patient, ${localPartner.length} partner`);
 
-                    // Use originalSaveEntries if available (from the overridden saveEntries)
-                    if (typeof originalSaveEntries === 'function') {
-                        originalSaveEntries(patientEntries);
-                    } else {
-                        saveEntries(patientEntries);
-                    }
-                    savePartnerObservations(partnerEntries);
+                // Split remote by author
+                const remotePatient = remoteEntries.filter(e => (e.author || 'patient') === 'patient');
+                const remotePartner = remoteEntries.filter(e => e.author === 'partner');
+
+                // Create lookup sets for remote entries (by unique key: date+type+author)
+                const getUniqueKey = (e) => `${(e.date || '').split('T')[0]}:${e.type}:${e.author || 'patient'}`;
+                const remotePatientKeys = new Set(remotePatient.map(getUniqueKey));
+                const remotePartnerKeys = new Set(remotePartner.map(getUniqueKey));
+
+                // Find local entries NOT in remote (pending sync) - keep them!
+                const pendingPatient = localPatient.filter(e => !remotePatientKeys.has(getUniqueKey(e)));
+                const pendingPartner = localPartner.filter(e => !remotePartnerKeys.has(getUniqueKey(e)));
+
+                if (pendingPatient.length > 0) {
+                    debugLog(`${eventSource} preserving ${pendingPatient.length} pending patient entries`);
                 }
+                if (pendingPartner.length > 0) {
+                    debugLog(`${eventSource} preserving ${pendingPartner.length} pending partner entries`);
+                }
+
+                // Merge: remote entries + pending local entries
+                const mergedPatient = [...remotePatient, ...pendingPatient];
+                const mergedPartner = [...remotePartner, ...pendingPartner];
+
+                mergedPatient.sort((a, b) => new Date(b.date) - new Date(a.date));
+                mergedPartner.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                // Use originalSaveEntries to avoid triggering another sync
+                if (typeof originalSaveEntries === 'function') {
+                    originalSaveEntries(mergedPatient);
+                } else {
+                    localStorage.setItem('tamoxifen-entries', JSON.stringify(mergedPatient));
+                }
+                savePartnerObservations(mergedPartner);
+
+                // Re-sync pending entries to Supabase (in case previous sync failed)
+                if (pendingPatient.length > 0 || pendingPartner.length > 0) {
+                    debugLog(`${eventSource} re-syncing pending entries`);
+                    const allPending = [...pendingPatient, ...pendingPartner];
+                    for (const entry of allPending) {
+                        saveOrDeleteEntryToSupabase(entry).catch(e =>
+                            console.error('Re-sync error:', e)
+                        );
+                    }
+                }
+
                 renderHistory();
                 renderPartnerHistory();
                 buildEffectList('effect-list', 'patient');
