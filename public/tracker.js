@@ -645,21 +645,37 @@ async function fetchEntriesFromSupabase() {
     console.log('fetchEntriesFromSupabase: Fetching for household', currentHouseholdId);
     const { data, error } = await supabaseClient
         .from('entries')
-        .select('payload, created_by_user_id')
+        .select('payload, created_by_user_id, updated_at')
         .eq('household_id', currentHouseholdId)
-        .order('occurred_at', { ascending: false });
+        .order('updated_at', { ascending: false }); // Order by updated_at to get most recent first
 
     if (error) {
         console.error('fetchEntriesFromSupabase: Error', error);
         throw error;
     }
 
-    console.log('fetchEntriesFromSupabase: Found', (data || []).length, 'entries');
-    // Include created_by_user_id in the payload so frontend can check ownership
-    return (data || []).map(row => ({
-        ...row.payload,
-        _created_by_user_id: row.created_by_user_id
-    }));
+    console.log('fetchEntriesFromSupabase: Found', (data || []).length, 'raw entries');
+    
+    // Deduplicate: keep only the most recent entry per (date, type, author)
+    // Since we ordered by updated_at desc, the first occurrence is the most recent
+    const dedupMap = new Map();
+    for (const row of (data || [])) {
+        const payload = row.payload;
+        const dateKey = (payload.date || '').split('T')[0];
+        const author = payload.author || 'patient';
+        const uniqueKey = `${dateKey}:${payload.type}:${author}`;
+        
+        if (!dedupMap.has(uniqueKey)) {
+            dedupMap.set(uniqueKey, {
+                ...payload,
+                _created_by_user_id: row.created_by_user_id
+            });
+        }
+    }
+    
+    const dedupedEntries = Array.from(dedupMap.values());
+    console.log('fetchEntriesFromSupabase: After dedup:', dedupedEntries.length, 'entries');
+    return dedupedEntries;
 }
 
 async function deleteEntryFromSupabase(entryId) {
