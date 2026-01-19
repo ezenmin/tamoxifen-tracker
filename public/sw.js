@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tamoxifen-tracker-v21';
+const CACHE_NAME = 'tamoxifen-tracker-v22';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -34,9 +34,16 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch: network-first for navigations and critical JS, cache-first for other assets
+// Fetch: skip external API requests, handle app assets only
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
+  
+  // IMPORTANT: Don't intercept Supabase or other external API requests
+  // Let them pass through directly to avoid CORS issues
+  if (url.hostname !== self.location.hostname) {
+    return; // Don't call respondWith - let browser handle it normally
+  }
+  
   const isNetworkFirst = event.request.mode === 'navigate' ||
     NETWORK_FIRST_FILES.some(f => url.pathname.endsWith(f));
 
