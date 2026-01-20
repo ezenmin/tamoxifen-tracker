@@ -2520,20 +2520,34 @@
             // Fetch remote entries and MERGE with local (don't replace!)
             // This prevents data loss when sync hasn't completed yet
             try {
+                // CRITICAL: Snapshot local entries BEFORE fetch to avoid race condition
+                // (entries added during fetch would be lost if we snapshot after)
+                const localPatientSnapshot = getEntries();
+                const localPartnerSnapshot = getPartnerObservations();
+                debugLog(`${eventSource} snapshot: ${localPatientSnapshot.length} patient, ${localPartnerSnapshot.length} partner`);
+
                 const remoteEntries = await fetchEntriesFromSupabase();
                 debugLog(`${eventSource} fetched ${remoteEntries.length} remote entries`);
 
-                // Get current local entries BEFORE overwriting
-                const localPatient = getEntries();
-                const localPartner = getPartnerObservations();
-                debugLog(`${eventSource} local entries: ${localPatient.length} patient, ${localPartner.length} partner`);
+                // Also get entries added DURING fetch (in case user was typing)
+                const localPatientNow = getEntries();
+                const localPartnerNow = getPartnerObservations();
+
+                // Combine snapshot + current to catch any entries added during fetch
+                const getUniqueKey = (e) => `${(e.date || '').split('T')[0]}:${e.type}:${e.author || 'patient'}`;
+                const combineUnique = (arr1, arr2) => {
+                    const map = new Map();
+                    [...arr1, ...arr2].forEach(e => map.set(getUniqueKey(e), e));
+                    return Array.from(map.values());
+                };
+                const localPatient = combineUnique(localPatientSnapshot, localPatientNow);
+                const localPartner = combineUnique(localPartnerSnapshot, localPartnerNow);
 
                 // Split remote by author
                 const remotePatient = remoteEntries.filter(e => (e.author || 'patient') === 'patient');
                 const remotePartner = remoteEntries.filter(e => e.author === 'partner');
 
                 // Create lookup sets for remote entries (by unique key: date+type+author)
-                const getUniqueKey = (e) => `${(e.date || '').split('T')[0]}:${e.type}:${e.author || 'patient'}`;
                 const remotePatientKeys = new Set(remotePatient.map(getUniqueKey));
                 const remotePartnerKeys = new Set(remotePartner.map(getUniqueKey));
 
@@ -2555,13 +2569,17 @@
                 mergedPatient.sort((a, b) => new Date(b.date) - new Date(a.date));
                 mergedPartner.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-                // Use originalSaveEntries to avoid triggering another sync
+                // Use original save functions to avoid triggering another sync
                 if (typeof originalSaveEntries === 'function') {
                     originalSaveEntries(mergedPatient);
                 } else {
                     localStorage.setItem('tamoxifen-entries', JSON.stringify(mergedPatient));
                 }
-                savePartnerObservations(mergedPartner);
+                if (typeof originalSavePartnerObservations === 'function') {
+                    originalSavePartnerObservations(mergedPartner);
+                } else {
+                    localStorage.setItem('tamoxifen-partner-observations', JSON.stringify(mergedPartner));
+                }
 
                 // Re-sync pending entries to Supabase (in case previous sync failed)
                 if (pendingPatient.length > 0 || pendingPartner.length > 0) {
@@ -2746,6 +2764,20 @@
             // Sync to Supabase if logged in
             if (currentUser && currentHouseholdId) {
                 syncEntriesToSupabase(entries).catch(e => console.error('Sync error:', e));
+            }
+        };
+
+        // Override savePartnerObservations to sync (CRITICAL: was missing, caused partner data loss)
+        const originalSavePartnerObservations = savePartnerObservations;
+        savePartnerObservations = function(observations) {
+            originalSavePartnerObservations(observations);
+            // Sync partner observations to Supabase if logged in
+            if (currentUser && currentHouseholdId) {
+                // Partner observations need individual sync since they have author='partner'
+                const partnerEntries = observations.filter(o => o.author === 'partner');
+                for (const entry of partnerEntries) {
+                    saveOrDeleteEntryToSupabase(entry).catch(e => console.error('Partner sync error:', e));
+                }
             }
         };
 
